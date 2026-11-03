@@ -1,5 +1,7 @@
-# Vendored verbatim from sweety-handdraw-video 3.0.0 (commit 63154e4), skills/sweety-handdraw-video/scripts/music_synth.py.
-# Our own procedural instrumental beds (no samples). Only edit upstream and re-vendor; music.py wraps it for this skill.
+# Vendored from sweety-handdraw-video 3.0.0 (commit 63154e4), skills/sweety-handdraw-video/scripts/music_synth.py.
+# Our own procedural instrumental beds (no samples). music.py wraps it for this skill. Local additions, marked in the
+# code: render(bpm=, sections=, accents=, stretch=) and accent() for music "sync" (2026-11); with them unset the output is the
+# vendored one. Other changes belong upstream.
 # render_source() below belongs to the handdraw job layout and is unused here.
 """Procedural background-music beds: soft lo-fi/ambient pieces written and played entirely by this code.
 
@@ -254,18 +256,41 @@ def soft_ceiling(samples, ceiling, knee=.7):
     return samples
 
 
-def render(mood_name, seconds, seed=0, loop=False, first_bar=0):
+def accent(tones, tonic, level, rng):
+    """sweety-statechart-video addition: a soft cymbal swell and a fuller chord on a key downbeat (the rule stamp)."""
+    t = np.arange(int(2.4 * SAMPLE_RATE)) / SAMPLE_RATE
+    sos = signal.butter(2, (3000, 7000), 'bandpass', fs=SAMPLE_RATE, output='sos')
+    cymbal = signal.sosfilt(sos, rng.standard_normal(len(t))) * np.exp(-t / .9) * (1 - np.exp(-t / .006)) * .5
+    chord = sum(electric_piano(midi, 1.2, .5, rng) for midi in voiced(tones, tonic, tonic + 12)[:4])
+    out = np.zeros(len(t))
+    out[:len(chord)] += chord[:len(t)] * .45
+    return np.stack([cymbal * .9 + out, cymbal + out * .95], axis=1) * level
+
+
+def render(mood_name, seconds, seed=0, loop=False, first_bar=0, bpm=None, sections=None, accents=None, stretch=None):
     """Stereo float32 bed of `seconds` (rounded up to whole bars when loop=True) and a record of what was played.
     first_bar starts the arrangement later (e.g. SECTION_BARS for a preview of the full section B); bars keep their
-    absolute numbers, so a bar sounds the same whatever the render starts or ends with."""
+    absolute numbers, so a bar sounds the same whatever the render starts or ends with.
+    sweety-statechart-video additions (music "sync"; all default to the vendored behaviour): `bpm` overrides the mood's
+    tempo (the film nudges it by a few percent to meet its chapters); `sections` = [[bar, section index], ...] sets the
+    A/B/C/D density from each listed bar on (a chapter start) and restarts the progression there; `accents` = [seconds]
+    adds a soft cymbal and a fuller chord at those times (the rule stamp); `stretch` = {bar: seconds} lengthens those
+    bars like a fermata (the chord holds, lead and drums rest), so the next bar starts on a chapter or the stamp."""
     if mood_name not in MOODS:
         raise ValueError(f'Unknown builtin music mood {mood_name!r}; choose one of ' + ', '.join(MOODS))
     if not math.isfinite(seconds) or not 0 < seconds <= MAX_SECONDS:
         raise ValueError(f'Builtin music renders 0..{MAX_SECONDS:g} seconds')
-    mood = MOODS[mood_name]
+    mood = MOODS[mood_name] if not bpm else {**MOODS[mood_name], 'bpm': float(bpm)}
+    starts = sorted((int(bar), int(index)) for bar, index in sections or [])
+    held = {int(number): float(extra) for number, extra in (stretch or {}).items() if float(extra) > 0}
     beat = 60. / mood['bpm']
     bar = 4 * beat
+
+    def bar_start(number):                                # seconds into the render where bar `number` begins
+        return (number - first_bar) * bar + sum(extra for at, extra in held.items() if first_bar <= at < number)
     bars = math.ceil(seconds / bar - 1e-9)
+    if held:
+        bars = next(count for count in range(bars + 1) if bar_start(first_bar + count) >= seconds - 1e-9)
     frames = round(bars * bar * SAMPLE_RATE) if loop else round(seconds * SAMPLE_RATE)
     tail = int(4 * SAMPLE_RATE)
     score = Score(frames, tail)
@@ -276,16 +301,23 @@ def render(mood_name, seconds, seed=0, loop=False, first_bar=0):
     for local in range(bars):
         number = first_bar + local
         section = (number // SECTION_BARS) % len(SECTIONS)
+        counted, until = number, None                     # bar count inside the progression; next section start
+        if starts:
+            begin, section = max((item for item in starts if item[0] <= number), default=(0, 0))
+            section %= len(SECTIONS)
+            counted = number - begin
+            until = next((item[0] for item in starts if item[0] > number), None)
         density = SECTIONS[section]
         rng = np.random.default_rng(seed_for(VERSION, mood_name, seed, 'bar', number))
-        position = (number // mood['bars_per_chord']) % len(mood['progression'])
+        position = (counted // mood['bars_per_chord']) % len(mood['progression'])
         degree = mood['progression'][position]
         tones = chord_tones(mood, degree)
-        start = local * bar
+        start = local * bar if not held else bar_start(number)
         swell = .92 + .08 * math.sin(2 * math.pi * number / (2 * SECTION_BARS * len(SECTIONS)))  # slow breathing
-        if number % mood['bars_per_chord'] == 0 and density[0]:
+        if counted % mood['bars_per_chord'] == 0 and density[0]:
             pad_notes = voiced(tones, mood['tonic'], mood['tonic'] + 5)
-            length = mood['bars_per_chord'] * bar
+            span = min(mood['bars_per_chord'], until - number if until is not None else mood['bars_per_chord'])
+            length = span * bar if not held else bar_start(number + span) - start
             score.add(start * SAMPLE_RATE, pad_chord(pad_notes, length, mood['cutoff'], rng) * mood['pad'] * density[0] * swell * .5, .5)
             chords.append(degree)
         lead_notes = voiced(tones, mood['tonic'], mood['tonic'] + 12)
@@ -319,6 +351,13 @@ def render(mood_name, seconds, seed=0, loop=False, first_bar=0):
                 at = (start + swung * step_seconds + rng.normal(0, .003)) * SAMPLE_RATE
                 hit = drum(kind, velocity * density[3] * .35, rng)
                 score.add(at, pan(hit, .25 if kind in ('hat', 'shaker') else 0.) * .5, .12)
+    for index, when in enumerate(accents or []):          # sweety-statechart-video addition (see the docstring)
+        number = first_bar + int(max(0., when) // bar) if not held else \
+            max(n for n in range(first_bar, first_bar + bars + 1) if bar_start(n) <= max(0., when) + 1e-9)
+        begin = max((item[0] for item in starts if item[0] <= number), default=0) if starts else 0
+        degree = mood['progression'][((number - begin) // mood['bars_per_chord']) % len(mood['progression'])]
+        rng = np.random.default_rng(seed_for(VERSION, mood_name, seed, 'accent', index, round(when * 1000)))
+        score.add(when * SAMPLE_RATE, accent(chord_tones(mood, degree), mood['tonic'], .5, rng), .45)
     rng = np.random.default_rng(seed_for(VERSION, mood_name, seed, 'reverb'))
     response = reverb_response(2.6, rng)
     wet = np.stack([signal.oaconvolve(score.send[:, channel], response[:, channel])[:len(score.send)] for channel in (0, 1)], axis=1)
@@ -343,6 +382,8 @@ def render(mood_name, seconds, seed=0, loop=False, first_bar=0):
     soft_ceiling(mixed, 10 ** (CEILING_DBFS / 20))
     record = {'version': VERSION, 'mood': mood_name, 'seed': seed, 'loop': loop, 'bpm': mood['bpm'], 'key_midi': mood['tonic'],
               'bars': bars, 'first_bar': first_bar, 'seconds': round(frames / SAMPLE_RATE, 3), 'progression_degrees': list(mood['progression']),
+              **({'sections': [list(item) for item in starts]} if starts else {}), **({'accents': list(accents)} if accents else {}),
+              **({'stretch': {str(k): round(v, 4) for k, v in sorted(held.items())}} if held else {}),
               'target_lufs': TARGET_LUFS, 'loudness_lufs': loudness_lufs(mixed),
               'peak_dbfs': round(float(20 * np.log10(np.abs(mixed).max() + 1e-12)), 2)}
     return mixed.astype(np.float32), record
