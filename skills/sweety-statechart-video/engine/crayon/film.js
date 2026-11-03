@@ -158,6 +158,7 @@
     $.pose = K.pose;
     $.box = id => ch.L.boxes[id];
     $.dot = (...a) => K.dot(ctx, ...a);
+    $.set = (name, area, st) => K.sets.draw(ctx, name, area, st, $);
     return $;
   }
   function sceneState(ch, si, t, T) {

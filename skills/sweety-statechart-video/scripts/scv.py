@@ -64,7 +64,7 @@ def frame_size(spec):
     if r >= 1:
         return 1080, round(1080 * r / 2) * 2
     return round(1080 / r / 2) * 2, 1080
-ENGINE_FILES = ['ink.js', 'chart.js', 'layout.js', 'people.js', 'props.js', 'film.js', 'player.js', 'main.js']
+ENGINE_FILES = ['ink.js', 'chart.js', 'layout.js', 'people.js', 'props.js', 'sets.js', 'film.js', 'player.js', 'main.js']
 ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
 CAPTION_MAX = 24
 FPS = 30
