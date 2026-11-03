@@ -252,6 +252,7 @@
     $.pose = K.pose;
     $.box = id => ch.L.boxes[id];
     $.dot = (...a) => K.dot(ctx, ...a);
+    $.set = (name, area, st) => K.sets.draw(ctx, name, area, st, $);
     return $;
   }
   // what a scene's fg sees: S.T (film time, stepped to anim_fps if set), S.t, S.step, S.on(id), S.since(id), S.at(k),

@@ -11,6 +11,8 @@ usage: scv.py <command> JOB [options]
   check     JOB               structure, step references, captions, the rule checker (it finds the red path)
   layout    JOB               every chapter's finished poster with a grid + free areas (work/layout/), for scenes.js
   lint      JOB               picture checks with fixes: overlaps, blank paper, still steps, people, theme (work/lint.json)
+  draft     JOB [--write]     scenes.draft.js from the layout: a set piece and props in the free areas (scene_draft.py)
+  gallery   [--out DIR]       contact sheets of every prop, person and set piece (scripts/gallery.py)
   lines     JOB               work/lines.json: one narration line per captioned step
   voice     JOB [--redo ID]   synthesize, gate and ASR-check the lines (scripts/voice.py, MLX Python)
   plan      JOB               step times (from the voice, or the reference pace), work/timing.json + timeline.json
@@ -68,7 +70,7 @@ def frame_size(spec):
     if r >= 1:
         return 1080, round(1080 * r / 2) * 2
     return round(1080 / r / 2) * 2, 1080
-ENGINE_FILES = ['ink.js', 'theme.js', 'chart.js', 'layout.js', 'people.js', 'props.js', 'motion.js', 'film.js', 'player.js', 'lint.js', 'main.js']
+ENGINE_FILES = ['ink.js', 'theme.js', 'chart.js', 'layout.js', 'people.js', 'props.js', 'sets.js', 'motion.js', 'film.js', 'player.js', 'lint.js', 'main.js']
 ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
 CAPTION_MAX = 24
 FPS = 30
@@ -916,6 +918,9 @@ def list_voices():
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] in ('gallery', 'draft'):    # own options: scripts/gallery.py, scripts/scene_draft.py
+        sys.path.insert(0, str(SCRIPTS))
+        sys.exit(__import__('gallery' if sys.argv[1] == 'gallery' else 'scene_draft').main(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == 'add-voice':         # its own options; handled by add_voice.py
         run_py('add_voice.py', *sys.argv[2:], python=MLX_PY if Path(MLX_PY).exists() else None)
         return
