@@ -253,14 +253,6 @@
     const fill = (c, more = {}) => Object.assign({ fill: col(c) || c, h: { gap: S.gap, base: S.base, solid: C.white, w: S.hw, layers: [{ color: col(c) || c, alpha: S.layer }] }, w: S.w, amp: S.amp, stroke: ink }, more);
     K.seed('chibi' + (o.id || '') + x.toFixed(0) + floor.toFixed(0));
     const W = (lx, ly) => [x + lx * k, ly];
-    // legs and shoes (seated: short legs hang from the seat)
-    const fs = [P.ftB || [x - 9 * s, floor], P.ftF || [x + 11 * s, floor]].sort((a, b) => a[0] - b[0]);
-    const legs = seated ? [[-10, -14, Math.min(floor, hipY + 40 * k)], [10, 14, Math.min(floor, hipY + 40 * k)]]
-      : [[-10, -11 + ((fs[0][0] - x) / k + 11) * .6, fs[0][1] - 6 * k], [10, 11 + ((fs[1][0] - x) / k - 11) * .6, fs[1][1] - 6 * k]];
-    for (const [hx, lf, fy] of legs) {
-      K.shape(ctx, K.capsule([W(hx, hipY), W(lf, fy)], 15 * k, 13 * k), fill(pants === C.navy ? 'navy' : pants, { h: { gap: S.gap, base: S.base + .1, solid: C.white, w: S.hw } }));
-      K.shape(ctx, K.ell(x + (lf + (lf < 0 ? -3 : 3)) * k, fy + 3 * k, 11 * k, 6 * k, 14), fill(o.shoes || 'white', { h: { gap: 3, base: .35, solid: C.white, w: S.hw } }));
-    }
     // arms: far one behind the body, near one in front
     const kind = o.arms || P.arms || 'stand';
     const armAt = (d) => {
@@ -278,6 +270,16 @@
       K.shape(ctx, K.ell(A.ha[0], A.ha[1], 7.5 * k, 7 * k, 12), fill(o.gloves ? (o.gloves === true ? 'blue' : o.gloves) : 'skin', { h: { gap: 3, base: S.base * .8, solid: C.white, w: S.hw } }));
     };
     const far = armAt(-1), near = armAt(1);
+    const J = Object.assign({}, P, { head: headC, neck: [x, sy], hip: [x, hipY], haF: near.ha, elF: near.el, haB: far.ha, elB: far.el, chibi: true });
+    if (o.dry) return J;                                  // where the hands and head are, without drawing
+    // legs and shoes (seated: short legs hang from the seat)
+    const fs = [P.ftB || [x - 9 * s, floor], P.ftF || [x + 11 * s, floor]].sort((a, b) => a[0] - b[0]);
+    const legs = seated ? [[-10, -14, Math.min(floor, hipY + 40 * k)], [10, 14, Math.min(floor, hipY + 40 * k)]]
+      : [[-10, -11 + ((fs[0][0] - x) / k + 11) * .6, fs[0][1] - 6 * k], [10, 11 + ((fs[1][0] - x) / k - 11) * .6, fs[1][1] - 6 * k]];
+    for (const [hx, lf, fy] of legs) {
+      K.shape(ctx, K.capsule([W(hx, hipY), W(lf, fy)], 15 * k, 13 * k), fill(pants === C.navy ? 'navy' : pants, { h: { gap: S.gap, base: S.base + .1, solid: C.white, w: S.hw } }));
+      K.shape(ctx, K.ell(x + (lf + (lf < 0 ? -3 : 3)) * k, fy + 3 * k, 11 * k, 6 * k, 14), fill(o.shoes || 'white', { h: { gap: 3, base: .35, solid: C.white, w: S.hw } }));
+    }
     if (o.backpack) K.shape(ctx, K.rounded([[x - 24 * k, sy + 4 * k], [x + 24 * k, sy + 4 * k], [x + 26 * k, hipY], [x - 26 * k, hipY], [x - 24 * k, sy + 4 * k]], 10 * k), fill(o.backpack === true ? 'red' : o.backpack));
     arm(far, false);
     // the body: a short rounded shirt
@@ -331,7 +333,6 @@
       K.shape(ctx, K.ell(hx, hy - R * .2, R * 1.04, R * .9, 24, PI + .05, TAU - .05).concat([[hx + R * 1.04, hy - R * .22], [hx - R * 1.04, hy - R * .22]]), fill(c));
       K.shape(ctx, K.smooth([[hx + f * R * .1, hy - R * .3], [hx + f * R * 1.55, hy - R * .26], [hx + f * R * 1.5, hy - R * .1], [hx + f * R * .1, hy - R * .12]], 1, true), fill(c, { h: { gap: 2.4, base: .9, solid: C.white, w: S.hw } }));
     } else if (o.hat) hat(ctx, o.hat, hx, hy + R * .12, R * .95, f, 0, o);
-    const J = Object.assign({}, P, { head: headC, neck: [x, sy], hip: [x, hipY], haF: near.ha, elF: near.el, haB: far.ha, elB: far.el, chibi: true });
     arm(near, true);
     if (mood === 'sleepy' && o.t != null) for (let i = 0; i < 2; i++) { const d = ((t * .5 + i * .5) % 1); ctx.save(); ctx.globalAlpha = Math.sin(d * PI); K.text(ctx, 'z', hx + f * R * (1 + d * .8), hy - R * (1 + d * 1.2), { font: `${Math.round(R * (.5 + d * .4))}px ${K.FONT.type}`, color: ink, align: 'center' }); ctx.restore(); }
     if (mood === 'proud' && K.props.sparkle) K.props.sparkle(ctx, hx + f * R * 1.3, hy - R * 1.1, R * .4, t, C.straw);
@@ -348,6 +349,7 @@
       const fy = Math.max(P.ftB ? P.ftB[1] : P.hip[1], P.ftF ? P.ftF[1] : P.hip[1]);
       P = applyBuild(Object.assign({}, P), P.hip[0], fy, o.build);
     }
+    if (o.dry) return P;
     const s = P.s || 1, f = P.f || 1, r = 15 * s * B.head, lw = Math.max(1, Math.sqrt(s)) * (K.tier ? K.tier.outline / 3.2 : 1) * (pencilLook(o) ? .55 : 1);
     const N = P.neck, Hp = P.hip, L = B.limb, Tw = B.torso, Hw = B.hip;
     let vx = Hp[0] - N[0], vy = Hp[1] - N[1]; const vl = Math.hypot(vx, vy) || 1; vx /= vl; vy /= vl;

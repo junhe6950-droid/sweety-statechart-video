@@ -108,6 +108,13 @@
     return out;
   }
 
+  // the same person drawn into a cached layer: no clock, so no blink; and the joints alone, for the live layers
+  const still = (g, F, role, def, poseName, x, y, sc, f, more = {}) => person(g, F, role, def, poseName, x, y, sc, f, Object.assign({ t: undefined }, more));
+  function anchor(F, role, def, poseName, x, y, sc, f, more = {}) {
+    const look = cast(F, role, def, Object.assign({ t: undefined, dry: true }, more));
+    return (F.at[role] = P().person(null, K.pose[poseName || 'stand'](x, y, sc * F.s, f, look), look));
+  }
+
   /* ---------------- cached static layers ---------------- */
   const cache = new Map(), MAXC = 48;
   function cached(g, F, layer, key, fn) {
@@ -215,6 +222,7 @@
         if (i % 2) sh(g, K.ell(x, rail + 32 * s, 15 * s, 15 * s, 16), 'navy', 'far');
         else { ln(g, [[x, rail + 12 * s], [x, rail + 46 * s]], 'far', { w: 2.4 }); sh(g, K.ell(x, rail + 52 * s, 9 * s, 7 * s, 12), 'grey', 'far'); }
       }
+      still(g, F, 'helper', { ...K.outfits.chef, hair: 'bob', hat: 'bandana', hatColor: 'green', apron: 'straw' }, 'stand', L.helper, F.gy, .9, -F.f, { arms: F.is('serve') ? 'hold' : 'stir', face: F.is('serve') ? 'happy' : 'neutral' });
       const ox = F.X(.02), oy = F.Y(380);
       ln(g, [[ox, oy], [ox + f * 170 * s, oy + 6 * s]], 'far', { detail: true });
       for (let i = 0; i < 3; i++) { const x = ox + f * (16 + i * 50) * s; sh(g, [[x, oy + 2 * s], [x + 32 * s, oy + 3 * s], [x + 33 * s, oy + 54 * s], [x + 1 * s, oy + 52 * s]], 'white', 'far', { layers: [{ color: C.sky, alpha: .4 }] }); for (let k = 0; k < 3; k++) ln(g, [[x + 6 * s, oy + (16 + k * 10) * s], [x + 26 * s, oy + (16 + k * 10) * s]], 'far', { detail: true, color: k ? 'blueL' : 'red' }); }
@@ -222,7 +230,6 @@
     mid(g, F) {
       const L = F.lay, serve = F.is('serve'), toss = F.is('toss');
       person(g, F, 'hero', 'cook', 'stand', L.cook, F.gy, .98, F.f, { arms: serve ? 'give' : toss ? 'toss' : 'stir', face: serve ? 'happy' : toss ? 'proud' : 'neutral' });
-      person(g, F, 'helper', { ...K.outfits.chef, hair: 'bob', hat: 'bandana', hatColor: 'green', apron: 'straw' }, 'stand', L.helper, F.gy, .9, -F.f, { arms: serve ? 'hold' : 'stir', face: serve ? 'happy' : 'neutral' });
     },
     front(g, F) {
       const s = F.s, L = F.lay, f = F.f, cy = L.top;
@@ -308,6 +315,9 @@
       // lamps and the traffic light on the pavement
       for (const u of [.12, .62]) { const x = F.X(u); ln(g, [[x, F.Y(70)], [x, F.Y(300)]], 'mid', { w: 3 }); ln(g, K.qbez([x, F.Y(300)], [x + 10 * s, F.Y(318)], [x + 34 * s, F.Y(306)], 8), 'mid', { w: 3 }); sh(g, [[x + 20 * s, F.Y(306)], [x + 48 * s, F.Y(306)], [x + 54 * s, F.Y(290)], [x + 14 * s, F.Y(290)]], 'navy', 'mid'); }
       const tl = F.X(.9); ln(g, [[tl, F.Y(70)], [tl, F.Y(210)]], 'mid', { w: 3.2 }); sh(g, K.rect(tl - 14 * s, F.Y(286), 28 * s, 78 * s), 'navy', 'mid');
+      const wt = still(g, F, 'waiter', crowd(4), 'stand', F.X(.7), F.Y(72), .78, -F.f, { arms: rain ? 'carry' : 'phone', face: F.is('jam') ? 'worried' : 'neutral' });
+      if (rain) P().umbrella(g, wt.haF[0], wt.head[1] - 40 * s, 110 * s, 40 * s, 'red');
+      else P().phone(g, wt.haF[0] - F.f * 6 * s, wt.haF[1] - 2 * s, .3 * s, { screen: 'map' });
     },
     mid(g, F) {
       const s = F.s, L = F.lay, t = F.t, night = F.is('night'), rain = F.is('rain'), jam = F.is('jam');
@@ -320,10 +330,6 @@
       g.save(); g.beginPath(); g.rect(F.bx0, F.top - 200 * s, F.bx1 - F.bx0, F.by1 - F.top + 200 * s); g.clip();
       const wj = person(g, F, 'walker', crowd(0), 'walk', walkX, F.Y(72), .78, wf, { arms: rain ? 'carry' : undefined });
       if (rain) P().umbrella(g, wj.haF[0], wj.head[1] - 40 * s, 120 * s, 44 * s, 'violet');
-      const wx = F.X(.7);
-      const wt = person(g, F, 'waiter', crowd(4), 'stand', wx, F.Y(72), .78, -F.f, { arms: rain ? 'carry' : 'phone', face: jam ? 'worried' : 'neutral' });
-      if (rain) P().umbrella(g, wt.haF[0], wt.head[1] - 40 * s, 110 * s, 40 * s, 'red');
-      else P().phone(g, wt.haF[0] - F.f * 6 * s, wt.haF[1] - 2 * s, .3 * s, { screen: 'map', t });
       // traffic: far lane and near lane
       const cars = jam ? [['red', -1], ['green', -1], ['straw', -1], ['blue', -1], ['orange', -1]] : [['red', 1], ['green', -1]];
       if (jam) {
@@ -478,19 +484,20 @@
       ln(g, [[cx2, F.Y(58)], [cx2, F.Y(18)]], 'mid', { w: 3 }); ln(g, [[cx2 - 26 * s, F.gy - 4 * s], [cx2 + 26 * s, F.gy - 4 * s]], 'mid', { w: 3 });
       for (const d of [-1, 1]) K.dot(g, cx2 + d * 26 * s, F.gy - 4 * s, 4 * s, C.navy);
       plant(g, F.X(.97), F.Y(118), .7 * s, 'far', 'red');
+      if (F.is('meeting')) {
+        still(g, F, 'colleague2', 'clerk', 'stand', F.X(.6), F.gy, .9, -f, { arms: 'clap', face: 'happy' });
+        P().person(g, seatedAt(F, L.chair, .9, -f, { arms: 'hold' }), cast(F, 'colleague', 'boss', { face: 'neutral', t: undefined }));
+      } else if (!F.is('overtime')) still(g, F, 'colleague', 'office', 'stand', F.X(.2), F.gy, .9, f, { arms: 'hold', face: 'happy', hair: 'bob', shirt: 'stripes', shirtColor: 'green' });
     },
     mid(g, F) {
       const s = F.s, L = F.lay, t = F.t, f = F.f;
       const meet = F.is('meeting'), late = F.is('overtime');
       if (meet) {
         const b0 = Math.min(...L.board), b1 = Math.max(...L.board);
-        person(g, F, 'colleague2', 'clerk', 'stand', F.X(.6), F.gy, .9, -f, { arms: 'clap', face: 'happy' });
-        P().person(g, seatedAt(F, L.chair, .9, -f, { t, arms: 'hold' }), cast(F, 'colleague', 'boss', { face: 'neutral' }));
         person(g, F, 'hero', 'office', 'stand', F.X(.27), F.gy, .95, -f, { arms: 'point', target: [(b0 + b1) / 2 - f * 20 * s, F.Y(300)], face: 'happy' });
       } else {
         P().person(g, seatedAt(F, L.chair, .95, f, { t, arms: late ? 'sleep' : 'type' }), cast(F, 'hero', 'coder', { face: late ? 'sleepy' : 'neutral' }));
         F.at.hero = null;
-        if (!late) person(g, F, 'colleague', 'office', 'stand', F.X(.2), F.gy, .9, f, { arms: 'hold', face: 'happy', hair: 'bob', shirt: 'stripes', shirtColor: 'green' });
       }
     },
     front(g, F) {
@@ -553,14 +560,17 @@
         P().person(g, J, look);
         if (i === 1) P().phone(g, J.haF[0] + f * 6 * s, J.haF[1], .3 * s, { screen: 'pay' });
       }
+      const pay = F.is('pay'), change = F.is('change');
+      const J = still(g, F, 'customer', crowd(0), 'stand', L.first, F.gy, .92, f, SETS.counter.first(F));
+      if (pay) P().phone(g, J.haF[0] + f * 8 * s, J.haF[1] - 4 * s, .36 * s, { screen: 'pay', tilt: f * .5 });
+      if (!pay && !change) P().basket(g, J.haF[0] + f * 10 * s, J.haF[1] + 4 * s, 60 * s, 'red');
     },
+    first: F => ({ arms: F.is('pay') ? 'give' : F.is('change') ? 'reach' : 'carry', reach: [F.lay.till - F.f * 40 * F.s, F.lay.top - 30 * F.s], face: F.is('change') ? 'happy' : 'neutral' }),
     mid(g, F) {
       const s = F.s, L = F.lay, t = F.t, f = F.f;
       const pay = F.is('pay'), change = F.is('change');
       person(g, F, 'hero', 'cashier', 'stand', L.cashier, F.gy, .95, -f, { arms: change ? 'give' : pay ? 'hold' : 'stir', face: change ? 'happy' : 'neutral' });
-      const J = person(g, F, 'customer', crowd(0), 'stand', L.first, F.gy, .92, f, { arms: pay ? 'give' : change ? 'reach' : 'carry', reach: [L.till - f * 40 * s, L.top - 30 * s], face: change ? 'happy' : pay ? 'neutral' : 'neutral' });
-      if (pay) P().phone(g, J.haF[0] + f * 8 * s, J.haF[1] - 4 * s, .36 * s, { screen: 'pay', tilt: f * .5 });
-      if (!pay && !change) P().basket(g, J.haF[0] + f * 10 * s, J.haF[1] + 4 * s, 60 * s, 'red');
+
     },
     front(g, F) {
       const s = F.s, L = F.lay, f = F.f;
@@ -589,7 +599,7 @@
       if (pay) for (let i = 0; i < 2; i++) { const k = ((t * 1.8 + i * .5) % 1); g.save(); g.globalAlpha = 1 - k; K.line(g, K.ell(tx - f * 72 * s, cy - 30 * s, (20 + k * 30) * s, (20 + k * 30) * s, 12, f > 0 ? PI * .75 : -PI * .25, f > 0 ? PI * 1.25 : PI * .25), { color: C.green, w: 2.2, passes: 1 }); g.restore(); }
       if (change) {
         sh(g, K.rect(tx - 40 * s, cy - 6 * s, 80 * s, 14 * s * K.clamp(F.p * 3)), 'grey', 'near');
-        const h = F.at.hero, c = F.at.customer;
+        const h = F.at.hero, c = anchor(F, 'customer', crowd(0), 'stand', L.first, F.gy, .92, f, SETS.counter.first(F));
         if (h && c) for (let i = 0; i < 3; i++) { const k = ((t * .9 + i / 3) % 1), x = K.lerp(h.haF[0], c.haF[0], k), y = K.lerp(h.haF[1], c.haF[1], k) - Math.sin(k * PI) * 40 * s; P().coin(g, x, y, 9 * s, t + i); }
       }
     },
@@ -700,6 +710,7 @@
       sh(g, K.rect(b0, F.Y(150), b1 - b0, 64 * s), 'sky', 'mid', { layers: [{ color: C.blueL }] });
       for (const x of [b0 + 16 * s, b1 - 16 * s]) ln(g, [[x, seat], [x, F.gy]], 'mid', { w: 3 });
       sh(g, K.rect(b0 - 6 * s, seat, b1 - b0 + 12 * s, 10 * s), 'blue', 'mid');
+      if (F.is('register')) { const J = still(g, F, 'patient', crowd(8), 'stand', L.win0 - f * 40 * s, F.gy, .92, f, { arms: 'give', face: 'neutral' }); P().bankCard(g, J.haF[0] + f * 10 * s, J.haF[1] - 4 * s, .4 * s, {}); }
       const call = F.is('call');
       for (let i = 0; i < L.seats; i++) {
         if (call && i === 0) continue;
@@ -712,7 +723,6 @@
       const s = F.s, L = F.lay, t = F.t, f = F.f;
       const reg = F.is('register'), call = F.is('call');
       person(g, F, 'hero', 'nurse', 'stand', L.nurse, F.gy, .92, -f, { arms: reg ? 'type' : call ? 'wave' : 'hold', face: 'happy' });
-      if (reg) { const J = person(g, F, 'patient', crowd(8), 'stand', L.win0 - f * 40 * s, F.gy, .92, f, { arms: 'give', face: 'neutral' }); P().bankCard(g, J.haF[0] + f * 10 * s, J.haF[1] - 4 * s, .4 * s, {}); }
       if (call) {
         const k = K.ease(F.p), x = K.lerp(Math.min(L.b0, L.b1) + 30 * s, L.win0 - f * 60 * s, k);
         person(g, F, 'called', 'patient', k > .05 && k < .98 ? 'walk' : 'stand', x, F.gy, .9, f, { arms: k < .05 ? 'point' : undefined, target: L.screen, face: 'surprised' });
@@ -847,12 +857,14 @@
         const out = P().person(g, J, look);
         if (i === 1 && out) P().phone(g, out.haF[0], out.haF[1] - 8 * s, .26 * s, { screen: 'pay' });
       }
+      still(g, F, 'cashier', 'boba', 'stand', L.cashier, F.gy, 1.25, -f, { arms: F.is('order') ? 'type' : 'hold', face: F.is('order') ? 'happy' : 'neutral' });
+      still(g, F, 'customer', SETS.boba.guest, 'stand', L.first, F.gy, 1.2, f, SETS.boba.first(F));
     },
+    guest: { build: 'chibi', shirt: 'straw', pants: 'navy', hair: 'short' },
+    first: F => ({ arms: F.is('order') ? 'point' : F.is('call') ? 'cheer' : 'hold', target: [F.X(.15), F.Y(330)], face: F.is('call') ? 'happy' : F.is('order') ? 'neutral' : 'worried' }),
     mid(g, F) {
       const s = F.s, L = F.lay, t = F.t, f = F.f, order = F.is('order'), make = F.is('make'), call = F.is('call');
-      person(g, F, 'cashier', 'boba', 'stand', L.cashier, F.gy, 1.25, -f, { arms: order ? 'type' : 'hold', face: order ? 'happy' : 'neutral' });
       person(g, F, 'hero', 'barista', 'stand', L.barista, F.gy, 1.25, -f, { arms: make ? 'shake' : call ? 'give' : 'hold', face: call ? 'happy' : make ? 'proud' : 'neutral' });
-      person(g, F, 'customer', { ...K.outfits.chibi, shirt: 'straw', hair: 'short' }, 'stand', L.first, F.gy, 1.2, f, { arms: order ? 'point' : call ? 'cheer' : 'hold', target: [F.X(.15), F.Y(330)], face: call ? 'happy' : order ? 'neutral' : 'worried' });
     },
     front(g, F) {
       const s = F.s, L = F.lay, f = F.f;
@@ -874,7 +886,7 @@
       const h = F.at.hero;
       if (make && h) P().shaker(g, h.haF[0], h.haF[1] + 30 * s, .55 * s, { shake: true, t });
       if (call && h) P().bubbleTea(g, h.haF[0] + f * 4 * s, h.haF[1] + 30 * s, .5 * s, { tea: 'tan', tiger: true });
-      if (call) { const c = F.at.customer; if (c) P().pager(g, c.haF[0], c.haF[1] - 4 * s, .45 * s, { buzz: true, t, num: F.st.num || '42' }); P().bubble(g, (h ? h.head[0] : L.barista) - f * 34 * s, (h ? h.head[1] : F.Y(150)) - 20 * s, F.st.say || '42 号！', { size: Math.round(17 * s), side: f > 0 ? 'right' : 'left', pop: K.clamp(F.p * 2) }); }
+      if (call) { const c = anchor(F, 'customer', SETS.boba.guest, 'stand', L.first, F.gy, 1.2, f, SETS.boba.first(F)); if (c) P().pager(g, c.haF[0], c.haF[1] - 4 * s, .45 * s, { buzz: true, t, num: F.st.num || '42' }); P().bubble(g, (h ? h.head[0] : L.barista) - f * 34 * s, (h ? h.head[1] : F.Y(150)) - 20 * s, F.st.say || '42 号！', { size: Math.round(17 * s), side: f > 0 ? 'right' : 'left', pop: K.clamp(F.p * 2) }); }
     },
   };
 

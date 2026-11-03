@@ -175,7 +175,7 @@ def draft_chapter(ci, ch, lay, film_text, W, H):
     second = own[0][1] if own[0][0] >= 2 else None             # a second scene only when this chapter's own words ask for it
     why = [w for w in SETS[main][0] if w.lower() in text.lower()][:5]
     free = sorted(lay.get('free') or [], key=area_of, reverse=True)
-    lines, notes, used = [], [], set()
+    lines, still, notes, used = [], [], [], set()      # still: things that never move go into bg (drawn once)
 
     def set_call(name, r, label):
         modes = state_modes(ch, name)
@@ -227,21 +227,23 @@ def draft_chapter(ci, ch, lay, film_text, W, H):
             n = min(queue[:4], key=lambda q: fit(r, *PROPS[q][:2]))
             queue.remove(n)
             w0, h0, js, words = PROPS[n]
-            lines.append(f"    // {tag}: {n} (words: {', '.join(x for x in words if x.lower() in text.lower())[:40]})")
+            note = f"    // {tag}: {n} (words: {', '.join(x for x in words if x.lower() in text.lower())[:40]})"
         else:
             n = min(FILLERS[fill_i % len(FILLERS):] + FILLERS[:fill_i % len(FILLERS)], key=lambda q: fit(r, *FILLER_JS[q][:2]) + .3 * (FILLERS.index(q) < fill_i % len(FILLERS)))
             fill_i += 1
             w0, h0, js = FILLER_JS[n]
-            lines.append(f"    // {tag}: {n} (a filler; swap in something from the story)")
-        lines.append('    ' + place(js, w0, h0, r))
+            note = f"    // {tag}: {n} (a filler; swap in something from the story)"
+        dest = lines if re.search(r'\bT\b', js) else still
+        dest += [note, '    ' + place(js, w0, h0, r)]
         if h >= 150 and r['y1'] >= H - 60:
-            lines.append(f"    $.ground({r['x0'] + 10}, {r['x1'] - 10}, {r['y1'] - 10}, 6, 'g{ci}{r['x0']}');")
+            still.append(f"    $.ground({r['x0'] + 10}, {r['x1'] - 10}, {r['y1'] - 10}, 6, 'g{ci}{r['x0']}');")
     title = f"{ch.get('num') or ci + 1} {ch.get('title', '')}".strip()
     body = '\n'.join(lines) if lines else '    // no free area big enough: the chart fills this poster'
+    bg = ('  bg($) {\n' + '\n'.join(still) + '\n  },\n') if still else ''
     js = f"""/* ------------------------------------------------------------------ {title} */
 // {'; '.join(notes) if notes else 'props only'}
 SCENES[{ci + 1}] = {{
-  fg($, S) {{
+{bg}  fg($, S) {{
     const T = S.T;
 {body}
   }},
