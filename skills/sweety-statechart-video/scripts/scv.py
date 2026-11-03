@@ -259,11 +259,11 @@ def check(job, spec, quiet=False):
                 elif not quiet:
                     print(f"{where}: the checker found the red path: {' > '.join(r['path'])}")
                 fx = r.get('fixed')
-                if fx and fx['holds'] and not quiet:
-                    print(f"{where}: the fix holds: with {fx['edge']} {'guarded by ' + repr(fx['when']) if fx.get('when') else 'cut'}, nothing reaches {r['never']}")
-                elif fx:
+                if fx and not fx['holds']:
                     errors.append(f"{where}: the fix does not hold: with {fx['edge']} {'guarded by ' + repr(fx['when']) if fx.get('when') else 'cut'}, "
                                   f"{r['never']} is still reached: {' > '.join(fx['path'])}")
+                elif fx and not quiet:
+                    print(f"{where}: the fix holds: with {fx['edge']} {'guarded by ' + repr(fx['when']) if fx.get('when') else 'cut'}, nothing reaches {r['never']}")
             if m.get('rules'):                                     # a rules list: report it like TLC does
                 names = {s: (v or {}).get('label') or s for s, v in ch['states'].items()}
                 ck, rep = m['checked'], ch.get('reported') if isinstance(ch.get('reported'), dict) else {}
@@ -284,11 +284,11 @@ def check(job, spec, quiet=False):
                         warnings.append(f"{where}: rule {name}: the report says it {'holds' if said['holds'] else 'breaks'}, this chart says it "
                                         f"{'holds' if r['holds'] else 'breaks'} (the chart may not draw everything the model checks)")
                     fx = r.get('fixed')
-                    if fx and fx['holds'] and not quiet:
-                        print(f"    the fix holds: with {fx['edge']} {'guarded by ' + repr(fx['when']) if fx.get('when') else 'cut'}, {name} holds")
-                    elif fx:
+                    if fx and not fx['holds']:
                         errors.append(f"{where}: rule {name}: the fix does not hold: with {fx['edge']} "
                                       f"{'guarded by ' + repr(fx['when']) if fx.get('when') else 'cut'} it still breaks: {' > '.join(fx['path'])}")
+                    elif fx and not quiet:
+                        print(f"    the fix holds: with {fx['edge']} {'guarded by ' + repr(fx['when']) if fx.get('when') else 'cut'}, {name} holds")
             reach, possible = set(m.get('reach') or ()), set((m.get('possible') or m).get('reach') or ())
             if m.get('logic') and ch.get('vars') and not quiet:
                 print(f"{where}: logic: {m['configurations']} configurations under when / do, {m['possible']['configurations']} with every arrow possible")

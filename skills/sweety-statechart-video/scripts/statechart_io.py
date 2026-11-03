@@ -95,6 +95,15 @@ class Machine:
         self.idmap[raw] = nid
         return nid
 
+    def fresh(self, base):
+        """a new id for something the source does not name (a concurrent region, a final dot)."""
+        nid, n = re.sub(r'[^\w-]+', '_', base).strip('_') or 's', 2
+        stem = nid
+        while nid in self.nodes or nid in self.idmap.values() or nid in RESERVED:
+            nid = f'{stem}_{n}'
+            n += 1
+        return nid
+
     def state(self, raw, parent=ROOT, type=None, label=None):
         """get or create by source name (the first mention decides the parent)."""
         nid = self.clean(raw)
@@ -199,7 +208,7 @@ def parse_diagram(text, dialect):
         r = len(sc['regions']) - 1
         if not sc['finals'][r]:
             base = 'final' if sc['node'] == ROOT else f"{sc['node']}_final"
-            n = m._new(m.clean(f'__{base}{r + 1 if r else ""}'), sc['node'], 'final', label='[*]')
+            n = m._new(m.fresh(f'{base}{r + 1 if r else ""}'), sc['node'], 'final', label='[*]')
             sc['regions'][r].append(n['id'])
             sc['finals'][r] = n['id']
         return sc['finals'][r]
@@ -265,7 +274,7 @@ def parse_diagram(text, dialect):
                 if len(regions) > 1:
                     node['type'] = 'parallel'
                     for r, mem in enumerate(regions):
-                        R = m._new(m.clean(f"{node['id']}_r{r + 1}"), node['id'], 'compound', label=f"{node['label']} {r + 1}")
+                        R = m._new(m.fresh(f"{node['id']}_r{r + 1}"), node['id'], 'compound', label=f"{node['label']} {r + 1}")
                         for x in mem:
                             m.move(x, R['id'])
                         R['initial'] = sc['initials'][r]
@@ -2270,8 +2279,9 @@ def cli(argv, new_job=None):
     cmd, rest = argv[0], argv[1:]
     if cmd == 'import':
         ap = argparse.ArgumentParser(prog='scv.py import', description='turn an existing state machine into a film.json skeleton '
-                                     '(XState v5 .json/.js/.ts, Mermaid stateDiagram, SCXML, PlantUML); see references/import-export.md')
-        ap.add_argument('src', help='the state machine file')
+                                     '(XState v5 .json/.js/.ts, Mermaid stateDiagram, SCXML, PlantUML, or a /statechart output '
+                                     'folder with chart.mmd + report.md); see references/import-export.md')
+        ap.add_argument('src', help='the state machine file, or a /statechart chart folder')
         ap.add_argument('job', help='the job folder to make (film.json + scenes.js)')
         ap.add_argument('--format', choices=FORMATS, help='default: from the file name and content')
         ap.add_argument('--title', help='the film title (default: the machine name)')

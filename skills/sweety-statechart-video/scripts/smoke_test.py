@@ -30,6 +30,7 @@ def units():
     assert scv.target_duration({'duration': '1分钟'}) == (54, 66)
     assert scv.target_duration({'duration': '2-3分钟'}) == (120, 180)
     assert scv.target_duration({'duration': [60, 90]}) == (60, 90)
+    __import__('test_statechart_io').main()      # import / export, logic guards, history, fixes, rules (scripts/test_statechart_io.py)
 
 
 def main():

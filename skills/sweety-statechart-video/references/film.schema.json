@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/leo-xiaolei/sweety-statechart-video/skills/sweety-statechart-video/references/film.schema.json",
+  "title": "film.json",
+  "description": "格物 · 蜡笔状态图: one film. Chapters of cards (states), arrows (edges) and steps with captions. See film-spec.md. Fields the engine does not know are allowed, so a newer film still checks.",
+  "type": "object",
+  "required": ["title", "chapters"],
+  "properties": {
+    "title": {"type": "string", "description": "片名，开场时显示在字幕条上"},
+    "series": {"type": "string", "description": "每张海报左上角的小字页眉"},
+    "language": {"type": "string", "examples": ["zh", "en"]},
+    "aspect": {"type": "string", "pattern": "^\\s*\\d+(\\.\\d+)?\\s*[:：x×/／]\\s*\\d+(\\.\\d+)?\\s*$", "examples": ["3:4", "9:16", "16:9", "2.35:1"]},
+    "size": {"type": "array", "items": {"type": "number", "exclusiveMinimum": 0}, "minItems": 2, "maxItems": 2},
+    "duration": {"description": "目标时长：150、[60, 90]、\"1分钟\"、\"90秒\"",
+                 "anyOf": [{"type": "number"}, {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2}, {"type": "string"}]},
+    "voice": {"anyOf": [{"type": "string"}, {"type": "null"}, {"const": false}], "description": "旁白声音 id，\"none\" 为无声"},
+    "speed": {"type": "number", "exclusiveMinimum": 0},
+    "read_pace": {"type": "boolean"},
+    "say": {"$ref": "#/$defs/strings", "description": "全片读法表 {写法: 读法}"},
+    "music": {"anyOf": [{"type": "string"}, {"type": "object"}, {"type": "null"}, {"const": false}]},
+    "sfx": {"anyOf": [{"type": "boolean"}, {"type": "string"}, {"type": "array"}, {"type": "object"}]},
+    "watermark": {"anyOf": [{"type": "string"}, {"type": "null"}, {"const": false}]},
+    "player": {"type": "object"},
+    "poster": {"type": "string"},
+    "theme": {"description": "palette and paper",
+              "anyOf": [{"type": "string", "pattern": "^(crayon|night|kraft|riso|season:[a-z]+)$"},
+                        {"type": "object", "properties": {"base": {"type": "string"}, "colors": {"$ref": "#/$defs/strings"}, "paper": {"type": "string"}}}]},
+    "brand": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 3},
+    "anim_fps": {"anyOf": [{"type": "number", "exclusiveMinimum": 0}, {"type": "null"}]},
+    "camera": {"enum": ["follow", "push"]},
+    "outro": {"anyOf": [{"const": "overview"}, {"const": false}]},
+    "hook": {"anyOf": [{"type": "string"}, {"const": false}]},
+    "cast": {"type": "object", "additionalProperties": {"type": "object"}, "description": "characters defined once, used by name in scenes"},
+    "ai_label": {"anyOf": [{"type": "string"}, {"const": false}]},
+    "aigc": {"type": "object", "properties": {"producer": {"type": "string"}, "produce_id": {"type": "string"},
+                                              "propagator": {"type": "string"}, "propagate_id": {"type": "string"}}},
+    "episode": {"type": "number"},
+    "next": {"type": "string"},
+    "deliver": {"type": "array", "items": {"enum": ["clips", "longimage", "html", "gif"]}, "uniqueItems": true},
+    "i18n": {"type": "object", "additionalProperties": {"type": "object", "properties": {
+      "title": {"type": "string"}, "series": {"type": "string"}, "chapters": {"type": "array", "items": {"type": "object"}}}}},
+    "flow": {"enum": ["down", "right"], "description": "layout direction; wide frames may use right"},
+    "chapters": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/chapter"}}
+  },
+  "$defs": {
+    "strings": {"type": "object", "additionalProperties": {"type": "string"}},
+    "color": {"anyOf": [{"enum": ["pink", "straw", "orange", "green", "blue", "red", "violet", "teal", "grey"]},
+                        {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"}]},
+    "id": {"type": "string", "minLength": 1, "pattern": "^[^>#]+$"},
+    "expr": {"type": "string", "minLength": 1,
+             "description": "a small expression: numbers, true / false, 'strings', names from vars or state ids (true while active), + - * / %, == != < <= > >=, && || !, ( )"},
+    "value": {"type": ["number", "boolean", "string"]},
+    "path": {"type": "array", "items": {"type": "string"}},
+    "chapter": {
+      "type": "object",
+      "required": ["states", "steps"],
+      "properties": {
+        "title": {"type": "string", "description": "大标题，4–7 个字最好"},
+        "sub": {"type": "string"},
+        "tagline": {"type": "string"},
+        "num": {"type": "string"},
+        "states": {"type": "object", "minProperties": 1,
+                   "propertyNames": {"$ref": "#/$defs/id", "not": {"pattern": "^(end\\d*|start|entry|exit)$"}},
+                   "additionalProperties": {"$ref": "#/$defs/state"}},
+        "start": {"type": "string"},
+        "edges": {"type": "array", "items": {"$ref": "#/$defs/edge"}},
+        "regions": {"$ref": "#/$defs/regions"},
+        "vars": {"type": "object", "additionalProperties": {"$ref": "#/$defs/value"}, "description": "initial values for when / do"},
+        "rule": {"$ref": "#/$defs/rule"},
+        "rules": {"type": "array", "items": {"$ref": "#/$defs/ruleItem"}},
+        "reported": {"type": "object", "description": "another checker's totals (a /statechart report.md): {by, states, steps}",
+                     "properties": {"by": {"type": "string"}, "states": {"type": "integer"}, "steps": {"type": "integer"}}},
+        "checked": {"type": "object", "description": "written by the checker into the page's spec: {states, steps, capped}",
+                    "properties": {"states": {"type": "integer"}, "steps": {"type": "integer"}, "capped": {"type": "boolean"}}},
+        "exit": {"type": "object", "required": ["from"], "properties": {"from": {"type": "string"}, "label": {"type": "string"}}},
+        "steps": {"type": "array", "items": {"anyOf": [{"type": "string"}, {"$ref": "#/$defs/step"}]}}
+      }
+    },
+    "state": {
+      "type": "object",
+      "properties": {
+        "label": {"type": "string", "description": "卡片上的大字，2–6 个字"},
+        "tag": {"type": "string"},
+        "pin": {"$ref": "#/$defs/color"},
+        "at": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
+        "size": {"type": "number"},
+        "kind": {"enum": ["final", "error", "wait", "undo"]},
+        "mood": {"enum": ["rain", "night", "alert", "fixed", "warm"]},
+        "sfx": {"anyOf": [{"type": "string"}, {"type": "array", "items": {"type": "string"}}]},
+        "ambience": {"enum": ["rain", "fire", "street", "room"]}
+      }
+    },
+    "edge": {
+      "type": "object",
+      "required": ["from", "to"],
+      "properties": {
+        "from": {"type": "string"},
+        "to": {"type": "string"},
+        "id": {"type": "string"},
+        "label": {"type": "string", "description": "箭头上写发生了什么，8 个字以内"},
+        "if": {"type": "string", "description": "条件，显示成红色 [条件]"},
+        "text": {"type": "string"},
+        "style": {"enum": ["timer", "async"]},
+        "when": {"$ref": "#/$defs/expr", "description": "the guard as logic for the checker, over vars and states"},
+        "do": {"type": "object", "additionalProperties": {"anyOf": [{"$ref": "#/$defs/expr"}, {"type": ["number", "boolean"]}]},
+               "description": "assignments when the arrow is taken: {name: expression}"}
+      }
+    },
+    "regions": {
+      "type": "object",
+      "required": ["lanes"],
+      "properties": {
+        "id": {"type": "string"},
+        "title": {"type": "string"},
+        "at": {"type": "array"},
+        "history": {"type": "boolean", "description": "re-entering the box resumes where each lane was"},
+        "lanes": {"type": "array", "minItems": 1, "items": {
+          "type": "object", "required": ["id", "states"],
+          "properties": {"id": {"type": "string"}, "title": {"type": "string"},
+                         "tint": {"enum": ["sky", "rose", "mint", "straw", "lilac"]},
+                         "states": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+                         "start": {"type": "string"}}}}
+      }
+    },
+    "fix": {
+      "type": "object", "required": ["edge"],
+      "properties": {"edge": {"type": "string", "description": "the arrow the fix cuts (or guards with when)"},
+                     "if": {"type": "string"}, "when": {"$ref": "#/$defs/expr"}, "stamp": {"type": "string"}}
+    },
+    "result": {
+      "type": "object",
+      "description": "what the checker found (written into the page's spec)",
+      "properties": {"holds": {"type": ["boolean", "null"]}, "path": {"$ref": "#/$defs/path"}, "edges": {"$ref": "#/$defs/path"},
+                     "steps": {"type": "integer"}, "values": {"type": "array", "items": {"type": "object"}},
+                     "possible": {"type": "object"}, "fixed": {"type": "object"}, "capped": {"type": "boolean"},
+                     "source": {"type": "string"}, "by": {"type": "string"}, "error": {"type": "string"}}
+    },
+    "rule": {
+      "type": "object",
+      "properties": {
+        "never": {"type": "string"},
+        "breaks": {"type": "string"},
+        "stamp": {"type": "string"},
+        "path": {"$ref": "#/$defs/path"},
+        "found": {"type": "boolean"},
+        "stampAt": {"type": "array"},
+        "fix": {"$ref": "#/$defs/fix"},
+        "fixed": {"$ref": "#/$defs/result"}
+      }
+    },
+    "ruleItem": {
+      "type": "object",
+      "description": "one rule of a rules list: never (a state id or an expression), always (an expression), or stuck: false",
+      "properties": {
+        "id": {"type": "string"},
+        "text": {"type": "string"},
+        "never": {"type": "string"},
+        "always": {"$ref": "#/$defs/expr"},
+        "stuck": {"const": false},
+        "stamp": {"type": "string"},
+        "fix": {"$ref": "#/$defs/fix"},
+        "reported": {"type": "object", "description": "another checker's verdict (TLC): {holds, by, steps, path, events, edges}",
+                     "properties": {"holds": {"type": "boolean"}, "by": {"type": "string"}, "steps": {"type": ["integer", "null"]},
+                                    "path": {"$ref": "#/$defs/path"}, "events": {"$ref": "#/$defs/path"}, "edges": {"$ref": "#/$defs/path"}}},
+        "result": {"$ref": "#/$defs/result"}
+      }
+    },
+    "step": {
+      "type": "object",
+      "properties": {
+        "go": {"anyOf": [{"type": "string"}, {"type": "array", "items": {"type": "string"}}]},
+        "note": {"type": "string", "description": "字幕兼旁白，24 字以内"},
+        "say": {"type": "string"},
+        "on": {"type": "array", "items": {"type": "string"}},
+        "hold": {"type": "number"},
+        "trace": {"anyOf": [{"type": "boolean"}, {"type": "string"}, {"type": "integer", "minimum": 1}],
+                  "description": "true: the rule's red path; a rule id or 1-based index: that rule of the rules list"},
+        "focus": {"type": "number"},
+        "stamp": {"type": "string"},
+        "voice": {"type": "string"},
+        "tone": {"type": "string"},
+        "speaker": {"type": "string"},
+        "sfx": {"anyOf": [{"type": "string"}, {"type": "array"}, {"type": "object"}]},
+        "camera": {"enum": ["push", "pull", "overview"]},
+        "fix": {"type": "boolean"}
+      }
+    }
+  }
+}
