@@ -358,14 +358,9 @@ def overlay_svg(ch, W, Hh, desc):
 def mermaid(job, spec, ci):
     """the chapter in Mermaid: area A's exporter when this skill has it (statechart_io), else a plain stateDiagram"""
     try:
-        import statechart_io
-        for name in ('to_mermaid', 'mermaid', 'export_mermaid'):
-            fn = getattr(statechart_io, name, None)
-            if fn:
-                try:
-                    return fn(spec, ci), True
-                except TypeError:
-                    return fn(spec['chapters'][ci]), True
+        import statechart_io                                   # area A's exporter, one chapter at a time
+        one = dict(spec, chapters=[spec['chapters'][ci]])
+        return statechart_io.export_film(one, 'mermaid'), True
     except Exception:
         pass
     ch = spec['chapters'][ci]
@@ -398,13 +393,23 @@ def checked(spec, film):
     res = []
     for ch, r in zip(film['chapters'], modelcheck.check_film(spec)):
         rules = []
+        def say(x, res_):                                     # one rule in words: what it says, what the checker found
+            what = x.get('text') or (f'永远不会到「{publish.label(ch, x["never"])}」' if x.get('never') else
+                                     f'一直满足 {x["always"]}' if x.get('always') else '不会卡住' if x.get('stuck') is False else '规则')
+            if res_.get('holds'):
+                return True, what
+            found = f'{what}——打破了：{res_.get("steps", "?")} 步就能走到，最短的那条路用红线画在图上'
+            fx, fixed = x.get('fix') or {}, res_.get('fixed') or {}
+            if fx and fixed.get('holds'):
+                found += f'；加上「{fx.get("if") or fx.get("when") or fx.get("edge")}」以后，检查器确认它成立了'
+            return False, found
+        if ch.get('rule'):
+            rr = dict(ch['rule'], **{k: v for k, v in (r.get('rule') or {}).items() if k in ('holds', 'steps', 'fixed')})
+            rules.append(say(ch['rule'], rr))
         for x in ch.get('rules') or []:                       # area A: rules[i].result
-            res_ = x.get('result') or {}
-            rules.append((res_.get('holds'), x.get('words') or x.get('name') or json.dumps({k: v for k, v in x.items() if k != 'result'}, ensure_ascii=False)))
-        if not rules and r.get('rule'):
-            rr = r['rule']
-            bad = publish.label(ch, rr.get('never'))
-            rules.append((rr['holds'], f'永远不会到「{bad}」' + ('。成立。' if rr['holds'] else f'。不成立：{rr.get("steps", "?")} 步就能走到，检查器给出的最短路径用红线画在图上。')))
+            if x is ch.get('rule') or (ch.get('rule') and x.get('never') == ch['rule'].get('never') and not x.get('stuck') is False):
+                continue
+            rules.append(say(x, x.get('result') or {}))
         info = ch.get('checked') or {}
         res.append((info.get('states', r.get('configurations')), info.get('steps', r.get('transitions')), rules, r.get('stuck') or []))
     return res
@@ -488,11 +493,11 @@ def site(job, spec, label):
     </figcaption>
   </figure>""")
         states, steps_, rules, stuck = checks[ci]
-        rl = ''.join(f'<li class="{"holds" if ok else "broken" if ok is False else "info"}"><span class="mark" aria-hidden="true"></span><span>{"成立" if ok else "不成立" if ok is False else ""}：{H.escape(words)}</span></li>' for ok, words in rules)
+        rl = ''.join(f'<li class="{"holds" if ok else "broken" if ok is False else "info"}"><span class="mark" aria-hidden="true"></span><span>{H.escape(words)}{"——成立" if ok else ""}</span></li>' for ok, words in rules)
         if not rules:
             rl = '<li class="info"><span class="mark" aria-hidden="true"></span><span>这一章没有写规则；检查器确认每张卡片都走得到。</span></li>'
         if stuck:
-            rl += '<li class="info"><span class="mark" aria-hidden="true"></span><span>停下来的地方：' + H.escape('、'.join('+'.join(publish.label(ch, s) for s in c) for c in stuck)) + '</span></li>'
+            rl += '<li class="info"><span class="mark" aria-hidden="true"></span><span>走到这里就停住（没有箭头出去）：' + H.escape('、'.join('+'.join(publish.label(ch, s) for s in c) for c in stuck)) + '</span></li>'
         mm, from_a = mermaid(job, spec, ci)
         src_json = json.dumps(spec['chapters'][ci], ensure_ascii=False, indent=1)
         made.append(f"""
@@ -559,7 +564,7 @@ def site(job, spec, label):
 {''.join(made)}
 </section>
 <footer class="foot">
-  <p>由 <a href="https://github.com/threerocks/sweety-statechart-video">格物 · 蜡笔状态图（sweety-statechart-video）</a> 生成：画面由代码绘制{'，旁白由 AI 合成' if voiced else ''}，文件元数据带 AI 生成标识（GB 45438）。字体：霞鹜文楷、Courier Prime（SIL OFL），Special Elite（Apache 2.0）。</p>
+  <p>由 <a href="https://github.com/threerocks/sweety-statechart-video">格物 · 蜡笔状态图（sweety-statechart-video）</a> 生成：画面由代码绘制{'，旁白由 AI 合成' if voiced else ''}，文件元数据带 AI 生成标识（GB 45438）。字体均随包、可再分发：Noto Serif SC、朱雀仿宋、霞鹜漫黑、霞鹜文楷、Courier Prime（SIL OFL），Special Elite（Apache 2.0），Kevin Serif / Sans（MIT）。</p>
 </footer>
 </main>
 <script>{SITE_JS}</script>
