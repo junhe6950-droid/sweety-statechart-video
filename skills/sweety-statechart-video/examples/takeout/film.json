@@ -29,12 +29,14 @@
     "refunded": {
      "label": "已退款",
      "tag": "refunded",
-     "pin": "blue"
+     "pin": "blue",
+     "kind": "error"
     },
     "waiting": {
      "label": "待取餐",
      "tag": "ready",
-     "pin": "straw"
+     "pin": "straw",
+     "kind": "wait"
     },
     "delivering": {
      "label": "配送中",
@@ -44,7 +46,8 @@
     "arrived": {
      "label": "到你手上",
      "tag": "delivered",
-     "pin": "pink"
+     "pin": "pink",
+     "kind": "final"
     }
    },
    "start": "placed",
@@ -421,7 +424,8 @@
     "soggy": {
      "label": "坨了",
      "tag": "+30 min",
-     "pin": "red"
+     "pin": "red",
+     "mood": "alert"
     },
     "redo": {
      "label": "重做一碗",
@@ -431,13 +435,20 @@
     "served": {
      "label": "坨面送到",
      "tag": "served soggy",
-     "pin": "red"
+     "pin": "red",
+     "kind": "error"
     }
    },
    "start": "fresh",
    "rule": {
     "never": "served",
-    "stamp": "规则被打破"
+    "stamp": "规则被打破",
+    "text": "坨了的面，不能送到你手上",
+    "fix": {
+     "edge": "soggy>served",
+     "if": "出餐检查",
+     "stamp": "修好了"
+    }
    },
    "edges": [
     {
@@ -517,12 +528,14 @@
      "note": "检查器顺着红线，找到这条坏路"
     },
     {
-     "note": "加一道出餐检查，就能堵上"
+     "note": "加一道出餐检查，就能堵上",
+     "fix": true
     },
     {
      "note": "下次等外卖，你知道它在哪一格了"
     }
    ]
   }
- ]
+ ],
+ "hook": "一碗面，从下单到你手上，要走几格？"
 }

@@ -24,7 +24,8 @@
     "failed": {
      "label": "发送失败",
      "tag": "failed",
-     "pin": "red"
+     "pin": "red",
+     "kind": "error"
     },
     "sent": {
      "label": "已发送",
@@ -39,7 +40,8 @@
     "read": {
      "label": "已读",
      "tag": "read",
-     "pin": "pink"
+     "pin": "pink",
+     "kind": "final"
     }
    },
    "start": "typing",
@@ -274,7 +276,13 @@
    "start": "out",
    "rule": {
     "never": "twice",
-    "stamp": "规则被打破"
+    "stamp": "规则被打破",
+    "text": "同一条消息，不能收到两次",
+    "fix": {
+     "edge": "retry>twice",
+     "if": "编号重复就扔掉",
+     "stamp": "修好了"
+    }
    },
    "edges": [
     {
@@ -290,7 +298,8 @@
     {
      "from": "wait",
      "to": "retry",
-     "label": "三秒没回执"
+     "label": "三秒没回执",
+     "style": "timer"
     },
     {
      "from": "retry",
@@ -336,12 +345,14 @@
      "note": "检查器顺着红线，找到了两条"
     },
     {
-     "note": "给消息编个号，重复的就扔掉"
+     "note": "给消息编个号，重复的就扔掉",
+     "fix": true
     },
     {
      "note": "下次消息转圈，你知道它卡在哪一格了"
     }
    ]
   }
- ]
+ ],
+ "hook": "一条消息，要走几格才变成“已读”？"
 }
