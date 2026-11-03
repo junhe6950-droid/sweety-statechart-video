@@ -74,7 +74,7 @@
     const s = K.clamp(Math.min(w / spec.minW, h / spec.H0), .4, 1.7) * (st.scale || 1);
     const bleed = st.bleed ?? true, E = 26;
     const L = bleed && x0 <= E, R = bleed && x1 >= W - E, B = bleed && y1 >= H - E;
-    const bx0 = L ? -12 : x0, bx1 = R ? W + 12 : x1, by1 = B ? H + 8 : y1;
+    const bx0 = L ? 0 : x0, bx1 = R ? W : x1, by1 = B ? H : y1;
     const gy = B ? H - 40 * Math.min(1, s) : y1 - Math.min(26, 16 * s);
     const modes = [].concat(st.mode || spec.modes[0]);
     for (const m of spec.modes) if (st[m]) modes.push(m);
@@ -116,24 +116,36 @@
   }
 
   /* ---------------- cached static layers ---------------- */
-  const cache = new Map(), MAXC = 48;
+  // Bitmaps per (set, layer, state, boil, scale). When the scale is moving (a hook's slow zoom, a camera push) a bitmap
+  // made within 4% of the wanted scale is reused, drawn scaled, so a zoom costs two or three builds, not one a frame.
+  const cache = new Map(), near = new Map(), MAXC = 48;
+  const stKey = st => JSON.stringify(st, (k, v) => (k === 't' || k === 'p' || k === 'mode') ? undefined : v);
   function cached(g, F, layer, key, fn) {
     const m = g.getTransform ? g.getTransform() : null;
     if (!m || m.b || m.c || typeof document === 'undefined') return fn(g);
     const ext = { x0: Math.max(-20, F.bx0 - 40 * F.s), x1: Math.min(F.W + 20, F.bx1 + 40 * F.s), y0: Math.max(-20, F.top - 70 * F.s), y1: Math.min(F.H + 20, Math.max(F.y1, F.by1) + 20) };
     const dx = m.a * ext.x0 + m.e, dy = m.d * ext.y0 + m.f, ix = Math.floor(dx), iy = Math.floor(dy), ox = dx - ix, oy = dy - iy;
-    const k = [F.name, layer, key, F.x0, F.y0, F.x1, F.y1, F.s.toFixed(3), F.f, K.S.boil, m.a.toFixed(4), m.d.toFixed(4), Math.round(ox * 8), Math.round(oy * 8)].join('|');
-    let c = cache.get(k);
+    const base = [F.name, layer, key, F.x0, F.y0, F.x1, F.y1, F.s.toFixed(3), F.f, K.S.boil, F.stKey].join('|');
+    const k = base + '|' + [m.a.toFixed(4), m.d.toFixed(4), Math.round(ox * 8), Math.round(oy * 8)].join('|');
+    let c = cache.get(k), scaled = null;
     if (!c) {
+      const alt = near.get(base);
+      if (alt && cache.has(alt.k) && Math.abs(alt.a / m.a - 1) < .04 && Math.abs(alt.d / m.d - 1) < .04) scaled = alt;
+    }
+    if (!c && !scaled) {
       c = document.createElement('canvas');
       c.width = Math.max(1, Math.ceil(m.a * (ext.x1 - ext.x0)) + 2); c.height = Math.max(1, Math.ceil(m.d * (ext.y1 - ext.y0)) + 2);
       const o = c.getContext('2d');
       o.setTransform(m.a, 0, 0, m.d, -m.a * ext.x0 + ox, -m.d * ext.y0 + oy);
       fn(o);
       cache.set(k, c);
+      near.set(base, { k, a: m.a, d: m.d, ox, oy });
       if (cache.size > MAXC) cache.delete(cache.keys().next().value);
-    } else { cache.delete(k); cache.set(k, c); }
-    g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.drawImage(c, ix, iy); g.restore();
+    } else if (c) { cache.delete(k); cache.set(k, c); }
+    g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1;
+    if (scaled) { const sc = cache.get(scaled.k), rx = m.a / scaled.a, ry = m.d / scaled.d; g.drawImage(sc, dx - scaled.ox * rx, dy - scaled.oy * ry, sc.width * rx, sc.height * ry); }
+    else g.drawImage(c, ix, iy);
+    g.restore();
   }
 
   function draw(g, name, area, st0, $) {
@@ -141,13 +153,17 @@
     if (!spec) throw new Error(`no set piece "${name}" (have: ${Object.keys(SETS).join(', ')})`);
     if (!area || area.x1 == null) throw new Error(`$.set('${name}', area): area must be {x0, y0, x1, y1}`);
     const F = frame($, name, area, st0), part = F.st.part, key = spec.key ? spec.key(F) : '';
+    F.stKey = stKey(F.st);
     const seeded = (layer, fn) => (o) => { K.seed(name + layer + F.x0 + '|' + F.y0); fn(o, F); };
-    if (part === 'bg') { seeded('back', spec.back)(g); return out(F); }
-    if (part !== 'fg' && spec.back) cached(g, F, 'back', key, seeded('back', spec.back));
-    if (spec.mid) { K.seed(name + 'mid' + F.x0); spec.mid(g, F); }
-    if (spec.front) cached(g, F, 'front', key, seeded('front', spec.front));
-    if (spec.top) { K.seed(name + 'top' + F.x0); spec.top(g, F); }
-    return out(F);
+    g.save(); g.beginPath(); g.rect(0, 0, F.W, F.H); g.clip();          // bleed to the poster's edge, never past it
+    try {
+      if (part === 'bg') { seeded('back', spec.back)(g); return out(F); }
+      if (part !== 'fg' && spec.back) cached(g, F, 'back', key, seeded('back', spec.back));
+      if (spec.mid) { K.seed(name + 'mid' + F.x0); spec.mid(g, F); }
+      if (spec.front) cached(g, F, 'front', key, seeded('front', spec.front));
+      if (spec.top) { K.seed(name + 'top' + F.x0); spec.top(g, F); }
+      return out(F);
+    } finally { g.restore(); }
   }
   function out(F) { return { ground: F.gy, s: F.s, x0: F.x0, x1: F.x1, y0: F.y0, y1: F.y1, top: F.top, f: F.f, modes: F.modes, at: Object.assign({}, F.lay.at || {}, F.at) }; }
 
@@ -279,11 +295,12 @@
     modes: ['day', 'night', 'rain', 'jam'], minW: 460, H0: 420,
     plan(F) {
       const s = F.s, r = K.prng(K.fnv('street' + F.x0 + F.y0)), blds = [];
-      for (let x = F.bx0 - 10 * s; x < F.bx1;) { const w = (110 + r() * 70) * s; blds.push({ x, w, h: (210 + r() * 170) * s, c: ['lilac', 'peach', 'sky', 'mint', 'cream', 'tan'][(r() * 6) | 0], shop: r() < .45, sign: ['面', '药', '书', '茶', '修', '米'][(r() * 6) | 0] }); x += w + 6 * s; }
+      const signs = F.st.signs || [], si = { n: 0 };
+      for (let x = F.bx0 - 10 * s; x < F.bx1;) { const w = (110 + r() * 70) * s, shop = signs.length ? si.n < signs.length && r() < .8 : r() < .45; blds.push({ x, w, h: (210 + r() * 170) * s, c: ['lilac', 'peach', 'sky', 'mint', 'cream', 'tan'][(r() * 6) | 0], shop, sign: shop && signs.length ? signs[si.n++] : ['面', '药', '书', '茶', '修', '米'][(r() * 6) | 0] }); x += w + 6 * s; }
       const pave = F.Y(84), far = F.Y(46), near = F.Y(10);
-      return { blds, pave, far, near, at: { pavement: [F.X(.5), F.Y(70)], road: [F.X(.5), near] } };
+      return { blds, pave, far, near, at: { pavement: [F.X(.5), F.Y(72)], road: [F.X(.5), near], far: [F.X(.5), far], shops: blds.filter(b => b.shop).map(b => [b.x + b.w / 2, pave, b.sign]) } };
     },
-    key: F => (F.is('night') ? 'n' : 'd') + (F.is('rain') ? 'r' : '') + (F.is('jam') ? 'j' : ''),
+    key: F => (F.is('night') ? 'n' : 'd') + (F.is('rain') ? 'r' : '') + (F.is('jam') ? 'j' : '') + (F.st.walkers === false ? 'w' : ''),
     back(g, F) {
       const s = F.s, L = F.lay, night = F.is('night'), rain = F.is('rain');
       const skyTop = Math.max(F.y0 - (F.y0 <= 30 ? 20 : 0), F.Y(470));
@@ -302,7 +319,8 @@
           const aw = L.pave - 92 * s, n = Math.max(3, Math.round(b.w / (24 * s)));
           for (let i = 0; i < n; i++) { const ax = b.x + 4 * s + i * (b.w - 8 * s) / n, ww = (b.w - 8 * s) / n; sh(g, [[ax, aw], [ax + ww, aw], [ax + ww, aw + 22 * s], [ax + ww / 2, aw + 30 * s], [ax, aw + 22 * s]], i % 2 ? 'white' : (b.c === 'peach' ? 'green' : 'red'), 'far', { w: 1.6 }); }
           K.hatch(g, K.rect(b.x + 10 * s, aw + 34 * s, b.w - 20 * s, 56 * s), { color: lit ? C.yolk : C.sky, base: .55, gap: 4, layers: [{ color: lit ? C.straw : C.blueL, alpha: .5, angle: -.7 }] });
-          sh(g, K.rect(b.x + b.w / 2 - 15 * s, aw - 46 * s, 30 * s, 40 * s), 'red', 'far', { base: .8 });
+          const sw = Math.max(30 * s, Array.from(b.sign).length * 22 * s + 8 * s);
+          sh(g, K.rect(b.x + b.w / 2 - sw / 2, aw - 46 * s, sw, 40 * s), 'red', 'far', { base: .8 });
           K.text(g, b.sign, b.x + b.w / 2, aw - 18 * s, { font: `${Math.round(22 * s)}px ${FONT.type}`, align: 'center', color: C.white });
         }
       }
@@ -315,9 +333,9 @@
       // lamps and the traffic light on the pavement
       for (const u of [.12, .62]) { const x = F.X(u); ln(g, [[x, F.Y(70)], [x, F.Y(300)]], 'mid', { w: 3 }); ln(g, K.qbez([x, F.Y(300)], [x + 10 * s, F.Y(318)], [x + 34 * s, F.Y(306)], 8), 'mid', { w: 3 }); sh(g, [[x + 20 * s, F.Y(306)], [x + 48 * s, F.Y(306)], [x + 54 * s, F.Y(290)], [x + 14 * s, F.Y(290)]], 'navy', 'mid'); }
       const tl = F.X(.9); ln(g, [[tl, F.Y(70)], [tl, F.Y(210)]], 'mid', { w: 3.2 }); sh(g, K.rect(tl - 14 * s, F.Y(286), 28 * s, 78 * s), 'navy', 'mid');
-      const wt = still(g, F, 'waiter', crowd(4), 'stand', F.X(.7), F.Y(72), .78, -F.f, { arms: rain ? 'carry' : 'phone', face: F.is('jam') ? 'worried' : 'neutral' });
-      if (rain) P().umbrella(g, wt.haF[0], wt.head[1] - 40 * s, 110 * s, 40 * s, 'red');
-      else P().phone(g, wt.haF[0] - F.f * 6 * s, wt.haF[1] - 2 * s, .3 * s, { screen: 'map' });
+      const wt = F.st.walkers === false ? null : still(g, F, 'waiter', crowd(4), 'stand', F.X(.7), F.Y(72), .78, -F.f, { arms: rain ? 'carry' : 'phone', face: F.is('jam') ? 'worried' : 'neutral' });
+      if (wt && rain) P().umbrella(g, wt.haF[0], wt.head[1] - 40 * s, 110 * s, 40 * s, 'red');
+      else if (wt) P().phone(g, wt.haF[0] - F.f * 6 * s, wt.haF[1] - 2 * s, .3 * s, { screen: 'map' });
     },
     mid(g, F) {
       const s = F.s, L = F.lay, t = F.t, night = F.is('night'), rain = F.is('rain'), jam = F.is('jam');
@@ -328,16 +346,19 @@
       const span = F.w + 200 * s, walkX = F.x0 - 100 * s + ((t * (rain ? 40 : 55) * s + F.w * .3) % span);
       const wf = 1;
       g.save(); g.beginPath(); g.rect(F.bx0, F.top - 200 * s, F.bx1 - F.bx0, F.by1 - F.top + 200 * s); g.clip();
-      const wj = person(g, F, 'walker', crowd(0), 'walk', walkX, F.Y(72), .78, wf, { arms: rain ? 'carry' : undefined });
-      if (rain) P().umbrella(g, wj.haF[0], wj.head[1] - 40 * s, 120 * s, 44 * s, 'violet');
+      const wj = F.st.walkers === false ? null : person(g, F, 'walker', crowd(0), 'walk', walkX, F.Y(72), .78, wf, { arms: rain ? 'carry' : undefined });
+      if (wj && rain) P().umbrella(g, wj.haF[0], wj.head[1] - 40 * s, 120 * s, 44 * s, 'violet');
       // traffic: far lane and near lane
       const cars = jam ? [['red', -1], ['green', -1], ['straw', -1], ['blue', -1], ['orange', -1]] : [['red', 1], ['green', -1]];
-      if (jam) {
+      if (F.st.traffic === false) { /* the scene drives its own vehicles */ }
+      else if (jam) {
         const n = Math.max(3, Math.min(6, Math.floor((F.bx1 - F.bx0) / (190 * s))));
         for (let i = 0; i < n; i++) { const x = K.lerp(F.bx0 + 70 * s, F.bx1 - 70 * s, i / Math.max(1, n - 1)) + Math.sin(t * 9 + i) * .8 * s; P().car(g, x, L.far + (i % 2) * 2 * s, .74 * s, 1, { color: cars[i % cars.length][0] }); }
         const sx = F.X(.42);
+        if (F.st.rider !== false) {
         P().scooter(g, sx, L.near, .7 * s, 1, { logo: '外卖' });
         P().person(g, K.pose.ride(sx - 16 * s, L.near - 46 * s, .62 * s, 1, { t, bars: [sx + 38 * s, L.near - 70 * s] }), cast(F, 'rider', 'rider', { face: 'worried' }));
+        }
         for (let i = 0; i < n - 1; i += 2) { const x = K.lerp(F.bx0 + 70 * s, F.bx1 - 70 * s, i / Math.max(1, n - 1)); P().mark(g, x + 40 * s, L.far - 150 * s, '!', { pop: .6 + .4 * Math.abs(Math.sin(t * 3 + i)), color: 'red' }); }
       } else {
         const sp = (rain ? 90 : 160) * s, span2 = F.bx1 - F.bx0 + 400 * s;
