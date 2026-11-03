@@ -1,0 +1,85 @@
+---
+title: "Catch"
+---
+stateDiagram-v2
+  direction LR
+  state "Legend" as legend {
+    lg0: Breaks HeadsForTowerOnlyWhenGo or TowerNeverHit
+    lg1: Path to the HeadsForTowerOnlyWhenGo or TowerNeverHit bug
+  }
+  class lg0 breaks
+  class lg1 bugPath
+  state "At the same time" as all {
+    state "The booster" as r0 {
+      s0: Filling with propellant
+      s1: Holding the count
+      s2: Lifting off
+      s3: Through max Q
+      s4: Scrubbed for today
+      s5: Hot staging
+      s6: Flipping, burning back
+      s7: Diverted to the sea
+      s8: Coming in on a failed check
+      s9: Falling home
+      s10: Slowing over the tower
+      s11: Hits the tower
+      s12: Caught by the arms
+      [*] --> s0
+      s0 --> s1: a hold is called
+      s0 --> s2: the count reaches zero
+      s1 --> s0: the count resumes
+      s1 --> s4: the launch is scrubbed
+      s2 --> s3: the air presses hardest
+      s3 --> s5: most of the booster's engines cut off
+      s5 --> s6: the ship pulls away
+      s6 --> s7: a check fails: no-go
+      s6 --> s8: a check fails, it comes in anyway [no go/no-go poll]
+      s6 --> s9: every check passes: go for catch
+      s9 --> s10: the landing burn starts
+      s8 --> s11: it hits the tower [when The tower is Arms closing]
+      s10 --> s12: the arms catch it [when The tower is Arms closing]
+    }
+    --
+    state "The ship" as r1 {
+      s13: Riding on top
+      s14: Engines lit while attached
+      s15: Flying on to space
+      s16: Falling back, glowing
+      s17: Flipping upright
+      s18: Splashed down
+      [*] --> s13
+      s13 --> s14: most of the booster's engines cut off [when The booster is Through max Q]
+      s14 --> s15: the ship pulls away
+      s15 --> s16: falls back into the air
+      s16 --> s17: flips and lights its engines
+      s17 --> s18: touches the water
+    }
+    --
+    state "The tower" as r2 {
+      s19: Arms open, waiting
+      s20: Arms closing
+      s21: Damaged
+      s22: Holding the booster
+      [*] --> s19
+      s19 --> s20: the arms close [when The booster is one of Coming in on a failed check, Slowing over the tower and The ship is none of Engines lit while attached, Riding on top]
+      s20 --> s21: it hits the tower [when The booster is Coming in on a failed check]
+      s20 --> s22: the arms catch it [when The booster is Slowing over the tower]
+    }
+  }
+  classDef breaks fill:#ffecee,stroke:#e72e3b,stroke-width:2.5px,color:#cd2834
+  class s0 bugPath
+  class s2 bugPath
+  class s3 bugPath
+  class s5 bugPath
+  class s6 bugPath
+  class s8 breaks
+  class s8 bugPath
+  class s11 breaks
+  class s11 bugPath
+  class s13 bugPath
+  class s14 bugPath
+  class s15 bugPath
+  class s19 bugPath
+  class s20 bugPath
+  class s21 breaks
+  class s21 bugPath

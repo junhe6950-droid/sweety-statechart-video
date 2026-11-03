@@ -1,0 +1,24 @@
+@startuml
+' A phone call: dialing, then talking while the screen sleeps and wakes (PlantUML sample for scv.py import)
+skinparam monochrome true
+hide empty description
+state "待机" as Idle
+[*] --> Idle
+Idle --> Dialing : 拨号
+Dialing -right-> Idle : 挂断
+Dialing --> InCall : 接通 [对方在线]
+state "通话中" as InCall {
+  [*] --> Talking
+  Talking --> Muted : 静音
+  Muted --> Talking : 取消静音
+  ||
+  [*] --> ScreenOn
+  ScreenOn --> ScreenOff : 贴近耳朵
+  ScreenOff --> ScreenOn : 拿开
+}
+InCall --> Idle : 挂断
+InCall --> Held : 来电插拨
+Held --> InCall[H] : 切回
+Held --> [*] : 关机
+note right of Dialing : 还没接通
+@enduml

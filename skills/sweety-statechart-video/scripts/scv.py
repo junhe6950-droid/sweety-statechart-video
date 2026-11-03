@@ -5,6 +5,9 @@ each chart, drawn in JavaScript with the crayon kit). Narration in one of the sk
 
 usage: scv.py <command> JOB [options]
   new       JOB [--title T]   a job folder with a film.json and scenes.js to fill in
+  import    SRC JOB [--format xstate|mermaid|scxml|plantuml] [--title T]
+                              a job folder from an existing state machine (scripts/statechart_io.py)
+  export    JOB --to mermaid|xstate|scxml [-o FILE]   the film's charts back as code
   check     JOB               structure, step references, captions, the rule checker (it finds the red path)
   layout    JOB               every chapter's finished poster with a grid + free areas (work/layout/), for scenes.js
   lint      JOB               picture checks with fixes: overlaps, blank paper, still steps, people, theme (work/lint.json)
@@ -235,6 +238,11 @@ def check(job, spec, quiet=False):
             warnings.append(f'{where}: arrows never drawn by a step: {", ".join(never)}')
         if not any(r in ('start', 'entry') for st in steps for r in go_list(st if isinstance(st, dict) else {})):
             warnings.append(f'{where}: no step goes "start" (or "entry"), so the first card has no arrow in')
+        lerr, lwarn = modelcheck.lint_chapter(ch)                  # vars / when / do / rule.fix / steps' "fix"
+        errors += [f'{where}: {m}' for m in lerr]
+        warnings += [f'{where}: {m}' for m in lwarn]
+    import statechart_io
+    warnings += statechart_io.schema_problems(spec)                # references/film.schema.json, when jsonschema is installed
     model = []
     if not errors:
         model = modelcheck.check_film(spec)
@@ -246,16 +254,59 @@ def check(job, spec, quiet=False):
             ch = chapters[m['chapter'] - 1]
             if m.get('rule'):
                 r = m['rule']
-                if r['holds']:
+                p = r.get('possible') or {}
+                if r['holds'] and p and not p['holds']:
+                    warnings.append(f"{where}: rule never {r['never']} holds under the logic (when / do), so there is no red path to show; "
+                                    f"if every arrow could be taken it would break: {' > '.join(p['path'])}")
+                elif r['holds']:
                     warnings.append(f"{where}: rule never {r['never']} holds: no path reaches it, so there is no red path to show")
                 elif not quiet:
                     print(f"{where}: the checker found the red path: {' > '.join(r['path'])}")
-            reach = set()
-            for cfg in (modelcheck.explore(modelcheck.chart_of(ch)) or {}).get('prev', {}):
-                reach |= set(cfg)
+                fx = r.get('fixed')
+                if fx and not fx['holds']:
+                    errors.append(f"{where}: the fix does not hold: with {fx['edge']} {'guarded by ' + repr(fx['when']) if fx.get('when') else 'cut'}, "
+                                  f"{r['never']} is still reached: {' > '.join(fx['path'])}")
+                elif fx and not quiet:
+                    print(f"{where}: the fix holds: with {fx['edge']} {'guarded by ' + repr(fx['when']) if fx.get('when') else 'cut'}, nothing reaches {r['never']}")
+            if m.get('rules'):                                     # a rules list: report it like TLC does
+                names = {s: (v or {}).get('label') or s for s, v in ch['states'].items()}
+                ck, rep = m['checked'], ch.get('reported') if isinstance(ch.get('reported'), dict) else {}
+                if not quiet:
+                    print(f"{where}: checked {ck['states']} configurations and {ck['steps']} transitions"
+                          + (f" ({rep.get('by', 'TLC')}: {rep['states']} states, {rep.get('steps')} steps)" if rep.get('states') else ''))
+                for i, (item, r) in enumerate(zip(ch.get('rules') or [], m['rules'])):
+                    name = (item.get('id') or item.get('text') or f'rules[{i + 1}]') if isinstance(item, dict) else f'rules[{i + 1}]'
+                    if r.get('error'):
+                        errors.append(f'{where}: rule {name}: {r["error"]}')
+                        continue
+                    by = f" (as reported by {r.get('by') or 'TLC'})" if r.get('source') == 'report' else ''
+                    if not quiet and r['holds'] is not None:
+                        print(f"  {'✓' if r['holds'] else '✗'} {name} {'holds' if r['holds'] else 'breaks'}{by}"
+                              + ('' if r['holds'] or not r.get('path') else f" in {r['steps']} steps: {' > '.join(names.get(s, s) for s in r['path'])}"))
+                    said = item.get('reported') if isinstance(item, dict) else None
+                    if not by and isinstance(said, dict) and said.get('holds') is not None and said['holds'] != r['holds']:
+                        warnings.append(f"{where}: rule {name}: the report says it {'holds' if said['holds'] else 'breaks'}, this chart says it "
+                                        f"{'holds' if r['holds'] else 'breaks'} (the chart may not draw everything the model checks)")
+                    fx = r.get('fixed')
+                    if fx and not fx['holds']:
+                        errors.append(f"{where}: rule {name}: the fix does not hold: with {fx['edge']} "
+                                      f"{'guarded by ' + repr(fx['when']) if fx.get('when') else 'cut'} it still breaks: {' > '.join(fx['path'])}")
+                    elif fx and not quiet:
+                        print(f"    the fix holds: with {fx['edge']} {'guarded by ' + repr(fx['when']) if fx.get('when') else 'cut'}, {name} holds")
+            reach, possible = set(m.get('reach') or ()), set((m.get('possible') or m).get('reach') or ())
+            if m.get('logic') and ch.get('vars') and not quiet:
+                print(f"{where}: logic: {m['configurations']} configurations under when / do, {m['possible']['configurations']} with every arrow possible")
             for s in ch.get('states', {}):
-                if s not in reach:
+                if s not in possible:
                     warnings.append(f'{where}: state {s} cannot be reached from the start')
+                elif s not in reach:
+                    warnings.append(f'{where}: state {s} is possible, but under the logic (when / do) it is never reached')
+            for eid in m.get('dead') or []:
+                warnings.append(f'{where}: arrow {eid} never fires under the logic: its when is false whenever it could be taken')
+            for msg in m.get('eval_errors') or []:
+                errors.append(f'{where}: checker: {msg}')
+            if m.get('capped') or (m.get('possible') or {}).get('capped'):
+                warnings.append(f'{where}: the checker stopped at {modelcheck.LIMIT} configurations (do the vars keep growing?), so its answers are not complete')
             multi = [s for s in m.get('stuck', []) if len(s) > 1]
             if multi:
                 warnings.append(f"{where}: stuck combinations (no way out): {multi[:3]}")
@@ -868,6 +919,9 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == 'add-voice':         # its own options; handled by add_voice.py
         run_py('add_voice.py', *sys.argv[2:], python=MLX_PY if Path(MLX_PY).exists() else None)
         return
+    if len(sys.argv) > 1 and sys.argv[1] in ('import', 'export'):  # code <-> film.json; options in statechart_io.py
+        import statechart_io
+        return statechart_io.cli(sys.argv[1:], new_job=new_job)
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('cmd')
     ap.add_argument('jobs', nargs='*')

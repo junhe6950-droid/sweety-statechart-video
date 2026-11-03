@@ -1,0 +1,26 @@
+{
+  "id": "checkout",
+  "initial": "cart",
+  "context": { "stock": 2, "paid": false },
+  "states": {
+    "cart": {
+      "on": {
+        "CHECKOUT": { "target": "payment", "guard": { "type": "hasStock", "params": { "when": "stock > 0" } } },
+        "EMPTY": "#checkout.cancelled"
+      }
+    },
+    "payment": {
+      "initial": "entering",
+      "states": {
+        "entering": { "on": { "SUBMIT": "authorizing" } },
+        "authorizing": {
+          "invoke": { "src": "authorize", "onDone": { "target": "#checkout.shipped", "actions": [{ "type": "assign", "params": { "stock": "stock - 1", "paid": true } }] }, "onError": "declined" }
+        },
+        "declined": { "after": { "3000": "entering" } }
+      },
+      "on": { "BACK": "cart" }
+    },
+    "shipped": { "type": "final" },
+    "cancelled": { "type": "final" }
+  }
+}
