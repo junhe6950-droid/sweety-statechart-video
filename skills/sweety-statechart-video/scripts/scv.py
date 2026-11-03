@@ -19,6 +19,7 @@ usage: scv.py <command> JOB [options]
   voices                      list the voices
   add-voice ID --audio F --text T --consent self|authorized [--start S --end E] [--preview]
                               add your own voice (scripts/add_voice.py)
+  any JOB command takes --lang CODE: the translated version (film.json "i18n") in JOB/lang/CODE/ (scripts/i18n.py)
 """
 import argparse
 import base64
@@ -33,6 +34,8 @@ import time
 from pathlib import Path
 
 import modelcheck
+import i18n
+import audio_plan
 
 SKILL = Path(__file__).resolve().parent.parent
 ENGINE = SKILL / 'engine'
@@ -213,8 +216,9 @@ def check(job, spec, quiet=False):
                     errors.append(f'{where} step {si + 1}: go {r!r} matches no arrow (arrows: {", ".join(ids)})')
                 used.add(r)
             note = st.get('note') or ''
-            if len(note) > CAPTION_MAX:
-                warnings.append(f'{where} step {si + 1}: caption has {len(note)} characters (keep to {CAPTION_MAX}): {note}')
+            cap = i18n.caption_max(spec.get('language'), note)       # D: 24 for Chinese, 42 for Latin scripts
+            if len(note) > cap:
+                warnings.append(f'{where} step {si + 1}: caption has {len(note)} characters (keep to {cap}): {note}')
             if st.get('voice'):
                 try:
                     sys.path.insert(0, str(SCRIPTS))
@@ -257,6 +261,7 @@ def check(job, spec, quiet=False):
                 warnings.append(f"{where}: stuck combinations (no way out): {multi[:3]}")
     if not (job / 'scenes.js').exists():
         warnings.append('no scenes.js: the posters will have no pictures (see references/scenes.md)')
+    warnings += audio_plan.lint(spec)                                # D: sfx / ambience / tone / speaker fields
     if chapters and not errors:
         est, (lo, hi) = estimate_seconds(spec), target_duration(spec)
         nsteps = max(1, len(steps_of(spec)))
@@ -423,6 +428,8 @@ def write_lines(job, spec):
             item['say'] = st['say']
         if st.get('voice'):
             item['voice'] = st['voice']
+        if st.get('tone'):
+            item['tone'] = st['tone']                    # VoxCPM2 control text, see references/voices.md
         lines.append(item)
     out = {'language': spec.get('language', 'zh'), 'voice': v, 'say': spec.get('say') or {}, 'lines': lines}
     if spec.get('voxcpm'):
@@ -471,7 +478,7 @@ def plan(job, spec):
         if n + 1 == len(allsteps):
             d += 2.5 / sp + .8
         steps.append({'id': lid, 'ci': ci, 'si': si, 't0': round(t, 3), 'dur': round(d, 3), 't1': round(t + d, 3),
-                      'note': st.get('note') or '', 'tag': f"{ROMAN[ci]}.{si + 1}"})
+                      'note': st.get('note') or '', 'tag': f"{ROMAN[ci]}.{si + 1}", 'speaker': st.get('speaker')})
         t += d
     total = round(t + .4, 3)
     lo, hi = target_duration(spec)
@@ -488,17 +495,29 @@ def plan(job, spec):
             k = next(i for i, s_ in enumerate(steps) if s_['id'] == line['id'])
             line['at'] = round(steps[k]['t0'] + VOICE_AT, 3)
         total = round(total + shift, 3)
+    total, sync = audio_plan.music_sync(spec, steps, lines, sp, total, VOICE_AT)   # D: music "sync": onto the beat grid
     W, H = frame_size(spec)
     timing = {'W': W, 'H': H, 'fps': int(spec.get('fps', FPS)), 'speed': sp, 'lead': LEAD, 'duration': total, 'total': total, 'voice': v, 'target': [lo, hi], 'steps': steps}
+    # D: karaoke characters and the talk envelope (film seconds), sfx and ambience events (scripts/audio_plan.py)
+    entries = rep['lines'] if v else {}
+    at_of = {line['id']: line['at'] for line in lines}
+    for s_ in steps:
+        s_['chars'] = audio_plan.step_chars(entries.get(s_['id']), s_['note'], at_of[s_['id']]) if s_['id'] in at_of else None
+    timing['talk'] = audio_plan.talk_envelope([(line['at'], entries[line['id']]) for line in lines], total, timing['fps']) if lines else None
+    sfx, ambience = audio_plan.sound_events(spec, steps, sp)
     (job / 'work').mkdir(exist_ok=True)
     (job / 'work/timing.json').write_text(json.dumps(timing, ensure_ascii=False, indent=1))
-    sfx = [{'kind': 'pop', 'at': round(s['t0'] + .9 / sp, 3), 'gain_db': -6} for s in steps] if spec.get('sfx') else []
     music = spec.get('music') or None
     if isinstance(music, str):
         music = {'mood': music}
-    (job / 'work/timeline.json').write_text(json.dumps({'duration': total, 'lines': lines, 'music': music, 'sfx': sfx}, ensure_ascii=False, indent=1))
+    if sync:
+        music = {**music, 'sync': sync}
+    (job / 'work/timeline.json').write_text(json.dumps({'duration': total, 'lines': lines, 'music': music, 'sfx': sfx, 'ambience': ambience}, ensure_ascii=False, indent=1))
     print(f'plan: {len(steps)} steps, {total:.1f} s at speed {sp:g}' + (f', {len(lines)} narrated lines' if lines else ', silent')
-          + (f', +{stretch:.2f} s hold per step toward the target' if stretch else ''))
+          + (f', +{stretch:.2f} s hold per step toward the target' if stretch else '')
+          + (f', {len(sfx)} sfx' if sfx else '') + (f", ambience {', '.join(a['kind'] for a in ambience)}" if ambience else '')
+          + (f", music on the beat ({sync['bpm']:g} bpm, +{sync['holds_s']:.2f} s, worst "
+             f"{max(abs(x['planned_error_ms']) for x in sync['targets']):.0f} ms)" if sync else ''))
     if total < lo - 1 or total > hi + 1:
         print(f'note: {total:.0f} s is outside the target {lo:.0f}-{hi:.0f} s ("duration" in film.json); '
               + ('add steps or a chapter' if total < lo else 'cut steps') + ' to land inside it')
@@ -668,7 +687,7 @@ def run_py(script, *args, python=None):
 def sound(job, spec):
     """voice and/or music and/or sfx through mix.py; nothing for a silent film"""
     tl = json.loads((job / 'work/timeline.json').read_text())
-    if not (tl['lines'] or tl.get('music') or tl.get('sfx')):
+    if not (tl['lines'] or tl.get('music') or tl.get('sfx') or tl.get('ambience')):
         return None
     py = RENDER_PY if Path(RENDER_PY).exists() else None
     a = job / 'work/audio'
@@ -781,6 +800,7 @@ def main():
     ap.add_argument('--end', type=float)
     ap.add_argument('--title')
     ap.add_argument('--redo')
+    ap.add_argument('--lang', help='work on the translated version from film.json i18n (JOB/lang/<code>/)')
     a = ap.parse_args()
     if a.cmd == 'voices':
         return list_voices()
@@ -798,6 +818,8 @@ def main():
             t0 = time.time()
             try:
                 job, spec = load(j)
+                if a.lang:
+                    job, spec = load(i18n.sibling(job, spec, a.lang)[0])
                 dest = all_steps(job, spec, workers=a.workers)
                 summary.append({'job': str(job), 'ok': True, 'film': str(dest), 'seconds': round(time.time() - t0)})
             except SystemExit as e:
@@ -805,6 +827,8 @@ def main():
         print(json.dumps(summary, ensure_ascii=False, indent=1))
         return
     job, spec = load(a.jobs[0])
+    if a.lang:                                                     # the translated sibling job, then the same pipeline
+        job, spec = load(i18n.sibling(job, spec, a.lang)[0])
     if a.cmd == 'check':
         sys.exit(1 if check(job, spec)['errors'] else 0)
     elif a.cmd == 'layout':

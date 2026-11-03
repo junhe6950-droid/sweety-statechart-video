@@ -12,6 +12,12 @@ Reads JOB/work/lines.json (written by the engine):
     top of the global one.
   - optional "english_exceptions": {"word": "reason"} words accepted as the voice says them.
   - optional "voxcpm": {"cfg_value", "timesteps", "seed", "mode"} overrides the voice's verified parameters.
+  - line "tone": VoxCPM2 controllable cloning, e.g. "惊讶" -> "(惊讶)reading". mlx-audio honours the prefix only when the
+    text starts the sequence, i.e. in reference mode (the reference audio alone, no transcript continuation); in the
+    default combined mode it lands after the reference transcript and is read aloud. So a toned line is cloned in
+    reference mode (TONE_MODE). The control text is never part of the ASR comparison; it is part of the cache key.
+  - "language": Whisper's language; Chinese / Japanese / Korean / Thai lines are compared by characters (CER 0.15,
+    pinyin homophones for Chinese), languages written with spaces by words (WER 0.2, scripts/i18n.py uses_words).
 VoxCPM2 does not normalise digits: a reading that still holds Arabic numerals is refused with suggested say entries.
 
 Each line: synthesize (seed policy: the voice's verified seed, then +1, +2, +3), trim to speech (60 ms lead), gate
@@ -20,10 +26,11 @@ ending included, pinyin homophones allowed), find where the last syllable really
 again (and, if the line has English words, check that an English ear hears them). The first passing seed is kept.
 
 Writes JOB/work/audio/lines/<id>.wav (48 kHz mono 24-bit) and JOB/work/audio/voice.json:
-  {"voice": ..., "lines": {"<id>": {"dur", "text", "reading", "asr", "cer", "seed", "chars": [[char, t0, t1], ...] | null,
-   ...extras}}, "failed": {"<id>": {...}}}
+  {"voice": ..., "lines": {"<id>": {"dur", "text", "reading", "tone", "asr", "cer", "seed", "chars": [[char, t0, t1], ...] | null,
+   "env_hz": 100, "env": [0..1, ...], ...extras}}, "failed": {"<id>": {...}}}
 `chars` covers every character of `text` in order (punctuation included, ''.join == text), times in seconds inside
-the clip. Takes are cached by content (voice + model + reading + seed policy) under work/audio/cache, so renaming or
+the clip. `env` is the take's loudness every 10 ms, smoothed like a mouth (scv.py plan turns it into timing.json
+`talk`). Takes are cached by content (voice + model + reading + tone + seed policy) under work/audio/cache, so renaming or
 reordering line ids costs nothing; --redo ID rejects the current take and tries the next seeds.
 
 Ported from sweety-handdraw-video 3.0.0 (commit 63154e4): scripts/voxcpm_voice.py (VoxCPM2 MLX synthesis),
@@ -45,8 +52,9 @@ import time
 import numpy as np
 
 from audio_gate import measure, speech_span, loudness_lufs
-from asr import Whisper, covers, char_times, english_words, spoken_syllables, LATIN_WORD, PUNCTUATION
+from asr import Whisper, covers, covers_words, char_times, english_words, spoken_syllables, LATIN_WORD, PUNCTUATION, MAX_WER
 from meter import SR, read_wav, write_wav, to_rate, db
+import i18n
 
 CHECKS_VERSION = 2              # 2: a pinyin-only pass earns one more seed
 ATTEMPTS = 4
@@ -65,10 +73,38 @@ FADE_IN_SECONDS = .01
 MIN_CHAR_MATCH = .5            # below this share of characters matched by ASR, `chars` is null (too unreliable)
 SAFE_ID = re.compile(r'^[A-Za-z0-9_.-]+$')
 DIGITS = re.compile(r'\d+(?:\.\d+)?%?')
+ENV_HZ = 100                   # talk envelope: loudness 0..1 every 10 ms, for the player's talking mouths
+ENV_RANGE_DB = 28.             # 0 at this far under the line's loud frames, 1 at them
+ENV_ATTACK, ENV_RELEASE = .015, .07
+TONE_MODE = 'reference'        # a toned line: "(tone)text" cloned from the reference audio alone (see references/voices.md)
 
 
 def log(message):
     print(message, file=sys.stderr, flush=True)
+
+
+def talk_env(samples, rate=SR):
+    """Per-10 ms loudness 0..1 of a kept take, smoothed like a mouth (fast open, slower close), 2 decimals."""
+    hop, width = round(rate / ENV_HZ), round(.02 * rate)
+    x = np.asarray(samples, float)
+    if len(x) < width:
+        return []
+    energy = np.concatenate([[0.], np.cumsum(x ** 2)])
+    starts = np.arange(0, len(x) - width + 1, hop)
+    level = 10 * np.log10(np.maximum((energy[starts + width] - energy[starts]) / width, 1e-12))
+    top = np.percentile(level, 95)
+    target = np.clip((level - (top - ENV_RANGE_DB)) / ENV_RANGE_DB, 0, 1)
+    attack, release = 1 - np.exp(-1 / (ENV_HZ * ENV_ATTACK)), 1 - np.exp(-1 / (ENV_HZ * ENV_RELEASE))
+    out, value = [], 0.
+    for item in target:
+        value += (item - value) * (attack if item > value else release)
+        out.append(round(float(value), 2))
+    return out
+
+
+def coverage_of(language):
+    """The ASR comparison for a language: characters (CER, pinyin homophones) or words (WER)."""
+    return covers_words if i18n.uses_words(language) else covers
 
 
 # ------------------------------------------------------------------------------------------- say maps and readings
@@ -163,7 +199,10 @@ def number_reading(term, after=''):
     return '百分之' + said if percent else said
 
 
-def digit_terms(reading):
+def digit_terms(reading, language='zh'):
+    if i18n.uses_words(language):
+        return [(match.group(0), i18n.english_number(match.group(0)) if i18n.base_language(language) == 'en' else '<the number in words>')
+                for match in DIGITS.finditer(reading)]
     return [(match.group(0), number_reading(match.group(0), reading[match.end():])) for match in DIGITS.finditer(reading)]
 
 
@@ -334,13 +373,16 @@ class Engine:
                 self.cleaner = DeepFilterNetModel.from_pretrained(self.enhancement, subfolder=None)
             log(f'VoxCPM2 loaded in {time.time() - started:.1f}s ({self.model_path.name}, cfg {self.cfg}, {self.steps} steps)')
 
-    def synthesize(self, text, seed):
-        """(mono float samples at 48 kHz, synthesis seconds)."""
+    def synthesize(self, text, seed, control=None):
+        """(mono float samples at 48 kHz, synthesis seconds). `control` (a step's tone) becomes VoxCPM2's controllable
+        cloning prefix "(control)text" in reference mode; see TONE_MODE."""
         import mlx.core as mx
         self.load()
         kwargs = {'text': text, 'inference_timesteps': self.steps, 'cfg_value': self.cfg, 'max_tokens': len(text) * 6 + 10,
                   'ref_audio': str(self.reference)}
-        if self.mode == 'combined':
+        if control:
+            kwargs.update(text=f'({control}){text}', max_tokens=len(text) * 8 + 10)   # room for a slower reading
+        elif self.mode == 'combined':
             kwargs.update(prompt_audio=str(self.reference), prompt_text=self.transcript)
         started = time.time()
         mx.random.seed(seed)
@@ -355,9 +397,11 @@ class Engine:
         return to_rate(samples, rate), time.time() - started
 
 
-def check_take(audio, reading, whisper, exceptions):
-    """Gate, speech rate and ASR of a trimmed take; then the tail cut and a second ASR of the audio actually kept."""
+def check_take(audio, reading, whisper, exceptions, language='zh'):
+    """Gate, speech rate and ASR of a trimmed take; then the tail cut and a second ASR of the audio actually kept.
+    The ASR compares the reading only (a tone's control text is never spoken), by characters or by words."""
     started = time.time()
+    covers = coverage_of(language)
     gate = measure(audio, short_clip=True)
     failures = list(gate['failures'])
     start, end = speech_span(audio)
@@ -391,7 +435,7 @@ def check_take(audio, reading, whisper, exceptions):
                           **{key: coverage[key] for key in ('matched_by', 'pinyin_cer') if key in coverage})
             if coverage['status'] != 'pass':
                 failures.append(f"after the tail cut, ASR does not cover the reading (CER {coverage['cer']}): {heard['text']!r}")
-            if english_words(reading):
+            if not i18n.uses_words(language) and english_words(reading):
                 english = whisper.english_heard(kept, reading, exceptions)
                 result['english'] = english
                 if english['status'] != 'pass':
@@ -400,7 +444,7 @@ def check_take(audio, reading, whisper, exceptions):
     return kept, {**result, 'failures': failures, 'status': 'FAIL' if failures else 'PASS'}
 
 
-def generate(engine, reading, seeds, whisper, exceptions, label):
+def generate(engine, reading, seeds, whisper, exceptions, label, control=None, language='zh'):
     """Try seeds until one passes. Returns (kept audio or None, best failed take or None, attempts, kept-audio words,
     index of the chosen attempt or None). A take that passes only on toneless pinyin (Whisper heard a homophone, which
     can also be a tone slip: 商家 heard as 上加) earns one more seed; an exact character match there is preferred."""
@@ -408,7 +452,7 @@ def generate(engine, reading, seeds, whisper, exceptions, label):
     for index, seed in enumerate(seeds):
         if held is not None and index > held[3] + 1:
             break
-        raw, synth_seconds = engine.synthesize(reading, seed)
+        raw, synth_seconds = engine.synthesize(reading, seed, control)
         record = {'seed': seed, 'synth_seconds': round(synth_seconds, 2), 'raw_seconds': round(len(raw) / SR, 2)}
         if not len(raw) or not np.isfinite(raw).all() or not np.any(raw):
             attempts.append({**record, 'status': 'FAIL', 'failures': ['empty, silent or non-finite audio']})
@@ -420,7 +464,7 @@ def generate(engine, reading, seeds, whisper, exceptions, label):
             attempts.append({**record, 'status': 'FAIL', 'failures': ['no speech found']})
             continue
         audio = raw[max(0, round((start - LEAD_SECONDS) * SR)):round((end + RAW_TAIL_SECONDS) * SR)]
-        kept, check = check_take(audio, reading, whisper, exceptions)
+        kept, check = check_take(audio, reading, whisper, exceptions, language)
         attempts.append({**record, **{key: value for key, value in check.items() if key != 'words'}})
         summary = f"cer {check.get('cer', check.get('asr_take', {}).get('cer', 'n/a'))}"
         log(f"[{label}] seed {seed}: synth {synth_seconds:.1f}s, check {check['check_seconds']:.1f}s, {check['status']} {summary}"
@@ -465,15 +509,25 @@ def load_lines(job):
         elif say is not None and (not isinstance(say, str) or not say.strip()):
             raise SystemExit(f'lines.json line {identifier}: say must be a reading string or a map')
         reading, segments = reading_of(text, global_map, say)
+        tone = line.get('tone')
+        if tone is not None and (not isinstance(tone, str) or re.search(r'[()（）]', tone)):
+            raise SystemExit(f'lines.json line {identifier}: tone must be a short description without brackets')
         seen.add(identifier)
-        lines.append({'id': identifier, 'text': text, 'reading': reading, 'segments': segments, 'voice': line.get('voice')})
+        lines.append({'id': identifier, 'text': text, 'reading': reading, 'segments': segments, 'voice': line.get('voice'),
+                      'tone': (tone or '').strip() or None})
     if not lines:
         raise SystemExit('lines.json has no lines')
     return spec, lines
 
 
-def signature(identity, reading, seeds):
+def signature(identity, reading, seeds, control=None, language='zh'):
+    """Cache key. The control text and a language other than Chinese join the key only when present, so every take
+    cached before tones and languages existed keeps its key."""
     payload = {'checks': CHECKS_VERSION, 'identity': identity, 'reading': reading, 'seeds': seeds}
+    if control:
+        payload['control'] = {'text': control, 'mode': TONE_MODE}
+    if i18n.base_language(language) not in ('', 'zh'):
+        payload['language'] = language
     return hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:24]
 
 
@@ -486,14 +540,16 @@ def seed_list(base, excluded):
     return seeds
 
 
-def probe_terms(job, lines, engine, whisper, exceptions):
-    """Voice each English word in its own sentence (two seeds) before the lines; numerals always need a reading."""
+def probe_terms(job, lines, engine, whisper, exceptions, language='zh'):
+    """Voice each English word in its own sentence (two seeds) before the lines; numerals always need a reading.
+    In a language written with spaces every word is Latin, so only numerals are reported."""
     folder = job / 'work' / 'audio' / 'term-probe'
     folder.mkdir(parents=True, exist_ok=True)
     terms = {}
+    latin_terms = not i18n.uses_words(language)
     for line in lines:
         for sentence in re.split(r'(?<=[。！？!?])', line['reading']):
-            for match in list(LATIN_WORD.finditer(sentence)) + list(DIGITS.finditer(sentence)):
+            for match in (list(LATIN_WORD.finditer(sentence)) if latin_terms else []) + list(DIGITS.finditer(sentence)):
                 terms.setdefault(match.group(0), (sentence.strip(), line['id'], sentence[match.end():]))
     report, voiced = [], {}
 
@@ -519,7 +575,7 @@ def probe_terms(job, lines, engine, whisper, exceptions):
 
     for term, (clause, line_id, after) in terms.items():
         if DIGITS.fullmatch(term):
-            said = number_reading(term, after)
+            said = number_reading(term, after) if latin_terms else digit_terms(term, language)[0][1]
             report.append({'term': term, 'line': line_id, 'clause': clause, 'status': 'needs_say', 'suggest': {term: said},
                            'advice': f'VoxCPM2 does not normalise digits: say {{"{term}": "{said}"}} (the caption keeps {term})'})
             continue
@@ -583,14 +639,16 @@ def main():
             engines[vid] = Engine(audio_env.voice_profile(vid), spec.get('voxcpm') or {})
         return engines[vid]
     main_engine = engine
-    whisper = None if arguments.no_asr else Whisper(whisper_dir, spec.get('language', 'zh'))
+    language = spec.get('language') or 'zh'
+    covers = coverage_of(language)
+    whisper = None if arguments.no_asr else Whisper(whisper_dir, i18n.base_language(language))
 
     if arguments.probe_terms:
-        report = probe_terms(job, lines, engine, whisper, exceptions)
+        report = probe_terms(job, lines, engine, whisper, exceptions, language)
         print(json.dumps([{key: item[key] for key in ('term', 'status', 'advice', 'suggest') if key in item} for item in report], ensure_ascii=False, indent=1))
         return 0
 
-    with_digits = {line['id']: digit_terms(line['reading']) for line in lines if DIGITS.search(line['reading'])}
+    with_digits = {line['id']: digit_terms(line['reading'], language) for line in lines if DIGITS.search(line['reading'])}
     if with_digits:
         suggestion = {term: said for terms in with_digits.values() for term, said in terms}
         raise SystemExit('Readings still contain Arabic numerals, which VoxCPM2 does not normalise: ' +
@@ -612,21 +670,26 @@ def main():
         engine = engine_for(line)
         if only and identifier not in only:
             kept_entry = (previous.get('lines') or {}).get(identifier)
-            if kept_entry and kept_entry.get('reading') == reading and kept_entry.get('text') == line['text'] and (out_dir / f'{identifier}.wav').is_file():
+            if kept_entry and kept_entry.get('reading') == reading and kept_entry.get('text') == line['text'] and \
+                    kept_entry.get('tone') == line['tone'] and (out_dir / f'{identifier}.wav').is_file():
                 entries[identifier] = kept_entry  # a line whose text changed is left out until it is regenerated
             elif identifier in (previous.get('failed') or {}):
                 failed[identifier] = previous['failed'][identifier]
             continue
-        base_key = signature(engine.identity, reading, [])
+        control = line['tone']
+
+        def keyed(seeds):
+            return signature(engine.identity, reading, seeds, control, language)
+        base_key = keyed([])
         excluded = set(exclusions.get(base_key, []))
-        key = signature(engine.identity, reading, seed_list(engine.seed, excluded))
+        key = keyed(seed_list(engine.seed, excluded))
         record_path, take_path = cache / f'{key}.json', cache / f'{key}.wav'
         record = json.loads(record_path.read_text()) if record_path.is_file() else None
         if identifier in redo and record and record.get('status') == 'pass':
             excluded.add(record['seed'])
             exclusions[base_key] = sorted(excluded)
             exclusions_path.write_text(json.dumps(exclusions, indent=1))
-            key = signature(engine.identity, reading, seed_list(engine.seed, excluded))
+            key = keyed(seed_list(engine.seed, excluded))
             record_path, take_path = cache / f'{key}.json', cache / f'{key}.wav'
             record = json.loads(record_path.read_text()) if record_path.is_file() else None
             log(f'[{identifier}] redo: seed {sorted(excluded)} rejected, trying {seed_list(engine.seed, excluded)}')
@@ -648,23 +711,25 @@ def main():
             log(f"[{identifier}] cached take (seed {record['seed']}, {record['dur']:.2f}s)")
         else:
             seeds = seed_list(engine.seed, excluded)
-            kept, best, attempts, words, chosen = generate(engine, reading, seeds, whisper, exceptions, identifier)
+            kept, best, attempts, words, chosen = generate(engine, reading, seeds, whisper, exceptions, identifier, control, language)
             if kept is None:
                 totals['failed'] += 1
                 failed_path = None
                 if best is not None:
                     failed_path = audio_dir / 'failed' / f'{identifier}.wav'
                     write_wav(failed_path, best)
-                failed[identifier] = {'text': line['text'], 'reading': reading, 'seeds': seeds, 'attempts': attempts,
+                failed[identifier] = {'text': line['text'], 'reading': reading, 'tone': control, 'seeds': seeds, 'attempts': attempts,
                                       'best_take_for_listening': str(failed_path) if failed_path else None,
-                                      'advice': 'rewrite the line or add a say reading for terms the voice cannot say, then rerun'}
+                                      'advice': 'rewrite the line or add a say reading for terms the voice cannot say' +
+                                                (', or soften / drop its tone' if control else '') + ', then rerun'}
                 (out_dir / f'{identifier}.wav').unlink(missing_ok=True)
                 continue
             totals['synthesized'] += 1
             write_wav(take_path, kept)
             final = attempts[chosen]
             final['chosen'] = True
-            record = {'status': 'pass', 'key': key, 'reading': reading, 'seed': final['seed'], 'dur': round(len(kept) / SR, 3),
+            record = {'status': 'pass', 'key': key, 'reading': reading, 'tone': control, 'tone_mode': TONE_MODE if control else None,
+                      'seed': final['seed'], 'dur': round(len(kept) / SR, 3), 'syllables_per_second': final.get('syllables_per_second'),
                       'asr': final.get('asr'), 'cer': final.get('cer'), 'words': words, 'asr_checked': bool(whisper),
                       **{key: final[key] for key in ('matched_by', 'pinyin_cer') if key in final},
                       'synth_seconds': round(sum(item.get('synth_seconds', 0) for item in attempts), 2),
@@ -675,13 +740,15 @@ def main():
         shutil.copyfile(take_path, out_dir / f'{identifier}.wav')
         chars, why = (caption_chars(line['text'], reading, line['segments'], record['words'], record['dur'])
                       if record.get('words') else (None, 'no ASR timestamps'))
-        entries[identifier] = {'dur': record['dur'], 'text': line['text'], 'reading': reading, 'voice': engine.identity['voice'], 'asr': record.get('asr'),
+        entries[identifier] = {'dur': record['dur'], 'text': line['text'], 'reading': reading, 'tone': control, 'voice': engine.identity['voice'], 'asr': record.get('asr'),
                                'cer': record.get('cer'), 'seed': record['seed'], 'chars': chars,
                                **{key: record[key] for key in ('matched_by', 'pinyin_cer') if key in record},
                                **({'chars_note': why} if chars is None else {}),
                                'asr_checked': record.get('asr_checked', False), 'attempts': len(record['attempts']),
                                'synth_seconds': record['synth_seconds'], 'lufs': loudness_lufs(kept),
-                               'peak_dbfs': round(db(np.abs(kept).max()), 2), 'file': f'lines/{identifier}.wav', 'cache_key': record['key']}
+                               'peak_dbfs': round(db(np.abs(kept).max()), 2), 'file': f'lines/{identifier}.wav', 'cache_key': record['key'],
+                               **({'syllables_per_second': record['syllables_per_second']} if record.get('syllables_per_second') else {}),
+                               'env_hz': ENV_HZ, 'env': talk_env(kept)}
         failed.pop(identifier, None)
 
     if not only:
@@ -689,9 +756,10 @@ def main():
             if stale.stem not in known:
                 stale.unlink()
     engine = main_engine
-    report = {'voice': engine.identity['voice'], 'voices': sorted(engines), 'language': spec.get('language', 'zh'), 'sample_rate': SR,
+    report = {'voice': engine.identity['voice'], 'voices': sorted(engines), 'language': language, 'sample_rate': SR,
               'engine': {key: value for key, value in engine.identity.items() if key != 'voice'},
-              'asr': {'model': str(whisper_dir) if whisper else None, 'checked': bool(whisper), 'max_cer': .15},
+              'asr': {'model': str(whisper_dir) if whisper else None, 'checked': bool(whisper),
+                      **({'metric': 'wer', 'max_wer': MAX_WER} if i18n.uses_words(language) else {'metric': 'cer', 'max_cer': .15})},
               'lines': {line['id']: entries[line['id']] for line in lines if line['id'] in entries},
               'failed': {line['id']: failed[line['id']] for line in lines if line['id'] in failed},
               'subjective_listening': 'not_performed'}

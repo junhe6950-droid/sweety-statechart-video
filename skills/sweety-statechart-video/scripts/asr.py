@@ -124,6 +124,39 @@ def covers(expected, actual, max_cer=MAX_CER, end_slack=0):
     return result
 
 
+MAX_WER = .2                    # word languages: one slip in a five-word line
+WORD_ALIKE = .8                 # a heard word this close to an expected one counts as it (colour/color, okay/ok)
+WORD_FORMS = {'ok': 'okay', "o'clock": 'oclock'}
+
+
+def word_tokens(text):
+    """Lowercase words of a spaced language: apostrophes kept inside words, hyphens split, numbers spelled out."""
+    from i18n import english_number
+    text = unicodedata.normalize('NFKC', text).lower().replace('’', "'")
+    text = re.sub(r'(?<=\d),(?=\d{3}(?:\D|$))', '', text)
+    text = re.sub(r'\d+(?:\.\d+)?%?', lambda match: ' ' + english_number(match[0]) + ' ', text)
+    tokens = re.findall(r"[^\W_]+(?:'[^\W_]+)*", text.replace('-', ' '))
+    return [WORD_FORMS.get(token, token.replace("'", '')) for token in tokens]
+
+
+def covers_words(expected, actual, max_wer=MAX_WER):
+    """covers() for languages written with spaces: word error rate over normalised words (a near-identical spelling
+    counts as the word), matched at both ends. The rate is reported as 'cer' too, so voice.py reads it the same way."""
+    want, heard = word_tokens(expected), word_tokens(actual)
+    vocabulary = set(want)
+    fixed = []
+    for token in heard:
+        if token not in vocabulary and len(token) >= 4:     # short words must be heard as themselves (can't / can)
+            close = max(vocabulary, key=lambda word: SequenceMatcher(None, word, token).ratio(), default=None)
+            if close and len(close) >= 4 and SequenceMatcher(None, close, token).ratio() >= WORD_ALIKE:
+                token = close
+        fixed.append(token)
+    error = edit_rate(want, fixed)
+    ok = anchored(want, fixed, error, max_wer, end_slack=0)
+    return {'cer': round(error, 3), 'wer': round(error, 3), 'metric': 'wer', 'status': 'pass' if ok else 'fail',
+            'asr_text': actual.lower()}
+
+
 def english_words(text):
     return [word.lower() for word in LATIN_WORD.findall(text)]
 

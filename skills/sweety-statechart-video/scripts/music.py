@@ -26,10 +26,29 @@ FADE_IN_SECONDS = 1.2
 FADE_OUT_SECONDS = 3.
 
 
-def render_bed(job, mood, duration, seed=0, fade_in=FADE_IN_SECONDS, fade_out=FADE_OUT_SECONDS):
-    """Render, fade and write work/audio/music.wav; returns the record also written to music.json."""
+def sync_key(sync):
+    """What makes a synced bed different: tempo, grid origin, sections and accents (None for an unsynced bed)."""
+    if not sync:
+        return None
+    keep = {key: sync.get(key) for key in ('bpm', 'origin', 'sections', 'accents', 'stretch')}
+    return hashlib.sha256(json.dumps(keep, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def render_bed(job, mood, duration, seed=0, fade_in=FADE_IN_SECONDS, fade_out=FADE_OUT_SECONDS, sync=None):
+    """Render, fade and write work/audio/music.wav; returns the record also written to music.json.
+    `sync` (timeline.json music.sync, from scv.py plan): {bpm, origin, sections, accents, stretch}; bar 0 of the bed
+    starts at film time `origin` (<= 0), so the render begins -origin seconds early and that lead is cut; section and
+    stretch bars count from there, accents are film seconds."""
     started = time.time()
-    stereo, record = music_synth.render(mood, float(duration), int(seed), loop=False)
+    if sync:
+        lead = -float(sync['origin'])
+        stereo, record = music_synth.render(mood, float(duration) + lead, int(seed), loop=False, bpm=sync['bpm'],
+                                            sections=sync.get('sections'), accents=[a + lead for a in sync.get('accents') or []],
+                                            stretch={int(k): float(v) for k, v in sync.get('stretch') or []})
+        stereo = stereo[round(lead * music_synth.SAMPLE_RATE):]
+        record.update(origin=sync['origin'], sync_key=sync_key(sync))
+    else:
+        stereo, record = music_synth.render(mood, float(duration), int(seed), loop=False)
     fade_in, fade_out = min(fade_in, duration / 3), min(fade_out, duration / 3)
     stereo = raised_cosine_fades(stereo, fade_in, fade_out)
     folder = Path(job) / 'work' / 'audio'
