@@ -1,4 +1,6 @@
-# sweety-statechart-video
+# 格物 · 蜡笔状态图（sweety-statechart-video）
+
+**一格一格，把事情讲明白。**
 
 跟你的 AI 助手说一句话，就能把一个流程、一门生意或一个系统，做成**会动的蜡笔状态图短片**：
 
@@ -12,6 +14,8 @@
 2. **四款逼真旁白**：纯合成音色，没有版权问题。也可以加自己的声音：`scv.py add-voice`。
 3. **默认 3:4**：任何比例都可以，写 `"aspect": "9:16"` 之类。
 4. **时长默认 2–3 分钟**：适配大部分自媒体。想要别的时长，写 `"duration": "1分钟"` 之类。
+
+![格物 · 蜡笔状态图：一句话，做一部会动的状态图](docs/images/cover-5x2.jpg)
 
 <p>
 <img src="docs/images/takeout-1.jpg" width="24%"> <img src="docs/images/takeout-3.jpg" width="24%"> <img src="docs/images/takeout-4.jpg" width="24%"> <img src="docs/images/message-1.jpg" width="24%">

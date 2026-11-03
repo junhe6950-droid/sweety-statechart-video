@@ -1,6 +1,6 @@
 {
  "title": "一句话，做一部会动的状态图",
- "series": "蜡笔状态图",
+ "series": "格物 · 蜡笔状态图",
  "language": "zh",
  "aspect": "3:4",
  "voice": "crayon-sister",
@@ -10,36 +10,134 @@
    "sub": "你说，它画",
    "tagline": "one sentence · one film",
    "states": {
-    "idea": {"label": "想讲清一件事", "tag": "an idea", "pin": "pink"},
-    "ask": {"label": "跟 AI 说一句", "tag": "one sentence", "pin": "straw"},
-    "chart": {"label": "拆成一格格", "tag": "statechart", "pin": "blue"},
-    "draw": {"label": "蜡笔画出来", "tag": "crayon", "pin": "orange"},
-    "voice": {"label": "配上旁白", "tag": "voice", "pin": "violet"},
-    "film": {"label": "片子 + 海报", "tag": "film + posters", "pin": "green"},
-    "post": {"label": "发出去", "tag": "post", "pin": "pink"}
+    "idea": {
+     "label": "想讲清一件事",
+     "tag": "an idea",
+     "pin": "pink"
+    },
+    "ask": {
+     "label": "跟 AI 说一句",
+     "tag": "one sentence",
+     "pin": "straw"
+    },
+    "chart": {
+     "label": "拆成一格格",
+     "tag": "statechart",
+     "pin": "blue"
+    },
+    "draw": {
+     "label": "蜡笔画出来",
+     "tag": "crayon",
+     "pin": "orange"
+    },
+    "voice": {
+     "label": "配上旁白",
+     "tag": "voice",
+     "pin": "violet"
+    },
+    "film": {
+     "label": "片子 + 海报",
+     "tag": "film + posters",
+     "pin": "green"
+    },
+    "post": {
+     "label": "发出去",
+     "tag": "post",
+     "pin": "pink"
+    }
    },
    "start": "idea",
    "edges": [
-    {"from": "idea", "to": "ask", "label": "打开 AI 助手"},
-    {"from": "ask", "to": "chart", "label": "它来拆"},
-    {"from": "chart", "to": "draw", "label": "它来画"},
-    {"from": "draw", "to": "voice", "label": "它来配"},
-    {"from": "voice", "to": "film", "label": "几分钟后"},
-    {"from": "film", "to": "ask", "label": "再说一句", "if": "想改"},
-    {"from": "film", "to": "post", "label": "直接发"}
+    {
+     "from": "idea",
+     "to": "ask",
+     "label": "打开 AI 助手"
+    },
+    {
+     "from": "ask",
+     "to": "chart",
+     "label": "它来拆"
+    },
+    {
+     "from": "chart",
+     "to": "draw",
+     "label": "它来画"
+    },
+    {
+     "from": "draw",
+     "to": "voice",
+     "label": "它来配"
+    },
+    {
+     "from": "voice",
+     "to": "film",
+     "label": "几分钟后"
+    },
+    {
+     "from": "film",
+     "to": "ask",
+     "label": "再说一句",
+     "if": "想改"
+    },
+    {
+     "from": "film",
+     "to": "post",
+     "label": "直接发"
+    }
    ],
-   "exit": {"from": "post", "label": "好看在哪 ↓"},
+   "exit": {
+    "from": "post",
+    "label": "好看在哪 ↓"
+   },
    "steps": [
-    {"go": "start", "note": "有件事，你想给大家讲清楚"},
-    {"go": "idea>ask", "note": "打开 AI 助手，只说一句话"},
-    {"go": "ask>chart", "note": "它把这件事，拆成一格一格"},
-    {"go": "chart>draw", "note": "再用蜡笔，一笔一笔画出来"},
-    {"go": "draw>voice", "note": "配上好听的旁白"},
-    {"go": "voice>film", "note": "几分钟后，一部片就做好了"},
-    {"go": "film>ask", "note": "想改哪里，再说一句就行"},
-    {"go": ["ask>chart", "chart>draw", "draw>voice", "voice>film"], "on": ["film"], "note": "它会重新拆、重新画、重新配"},
-    {"go": "film>post", "note": "片子带着海报，直接发出去"},
-    {"go": "post>exit", "note": "那它到底好看在哪？"}
+    {
+     "go": "start",
+     "note": "有件事，你想给大家讲清楚"
+    },
+    {
+     "go": "idea>ask",
+     "note": "打开 AI 助手，只说一句话"
+    },
+    {
+     "go": "ask>chart",
+     "note": "它把这件事，拆成一格一格"
+    },
+    {
+     "go": "chart>draw",
+     "note": "再用蜡笔，一笔一笔画出来"
+    },
+    {
+     "go": "draw>voice",
+     "note": "配上好听的旁白"
+    },
+    {
+     "go": "voice>film",
+     "note": "几分钟后，一部片就做好了"
+    },
+    {
+     "go": "film>ask",
+     "note": "想改哪里，再说一句就行"
+    },
+    {
+     "go": [
+      "ask>chart",
+      "chart>draw",
+      "draw>voice",
+      "voice>film"
+     ],
+     "on": [
+      "film"
+     ],
+     "note": "它会重新拆、重新画、重新配"
+    },
+    {
+     "go": "film>post",
+     "note": "片子带着海报，直接发出去"
+    },
+    {
+     "go": "post>exit",
+     "note": "那它到底好看在哪？"
+    }
    ]
   },
   {
@@ -47,31 +145,109 @@
    "sub": "每一步，都在动",
    "tagline": "bead · line · words · pop · ring",
    "states": {
-    "go": {"label": "圆点出发", "tag": "bead", "pin": "pink"},
-    "line": {"label": "线跟着长", "tag": "line", "pin": "blue"},
-    "words": {"label": "字一个个打出", "tag": "words", "pin": "straw"},
-    "pop": {"label": "卡片蹦出来", "tag": "pop", "pin": "orange"},
-    "active": {"label": "变粉套圈", "tag": "active", "pin": "pink"}
+    "go": {
+     "label": "圆点出发",
+     "tag": "bead",
+     "pin": "pink"
+    },
+    "line": {
+     "label": "线跟着长",
+     "tag": "line",
+     "pin": "blue"
+    },
+    "words": {
+     "label": "字一个个打出",
+     "tag": "words",
+     "pin": "straw"
+    },
+    "pop": {
+     "label": "卡片蹦出来",
+     "tag": "pop",
+     "pin": "orange"
+    },
+    "active": {
+     "label": "变粉套圈",
+     "tag": "active",
+     "pin": "pink"
+    }
    },
    "start": "go",
    "edges": [
-    {"from": "go", "to": "line", "label": "沿着箭头跑"},
-    {"from": "line", "to": "words", "label": "到了字跟前"},
-    {"from": "words", "to": "pop", "label": "到站"},
-    {"from": "pop", "to": "active", "label": "站稳了"},
-    {"from": "active", "to": "go", "label": "下一步", "if": "还有"}
+    {
+     "from": "go",
+     "to": "line",
+     "label": "沿着箭头跑"
+    },
+    {
+     "from": "line",
+     "to": "words",
+     "label": "到了字跟前"
+    },
+    {
+     "from": "words",
+     "to": "pop",
+     "label": "到站"
+    },
+    {
+     "from": "pop",
+     "to": "active",
+     "label": "站稳了"
+    },
+    {
+     "from": "active",
+     "to": "go",
+     "label": "下一步",
+     "if": "还有"
+    }
    ],
-   "exit": {"from": "active", "label": "谁来讲 ↓"},
+   "exit": {
+    "from": "active",
+    "label": "谁来讲 ↓"
+   },
    "steps": [
-    {"go": "entry", "note": "每一步，都从一颗小圆点开始"},
-    {"go": "go>line", "note": "它沿着箭头跑，线跟着长出来"},
-    {"go": "line>words", "note": "字一个一个，像打字机打出来"},
-    {"go": "words>pop", "note": "到站了，新卡片蹦出来"},
-    {"go": "pop>active", "note": "变成粉色，再圈上一圈"},
-    {"go": "active>go", "note": "然后，下一颗圆点出发"},
-    {"go": ["go>line", "line>words", "words>pop", "pop>active"], "on": ["active"], "note": "旁边的小人、火苗、蒸汽，也一直在动"},
-    {"note": "每根线都在轻轻地抖，像手绘的动画"},
-    {"go": "active>exit", "note": "这么好看，由谁来讲呢？"}
+    {
+     "go": "entry",
+     "note": "每一步，都从一颗小圆点开始"
+    },
+    {
+     "go": "go>line",
+     "note": "它沿着箭头跑，线跟着长出来"
+    },
+    {
+     "go": "line>words",
+     "note": "字一个一个，像打字机打出来"
+    },
+    {
+     "go": "words>pop",
+     "note": "到站了，新卡片蹦出来"
+    },
+    {
+     "go": "pop>active",
+     "note": "变成粉色，再圈上一圈"
+    },
+    {
+     "go": "active>go",
+     "note": "然后，下一颗圆点出发"
+    },
+    {
+     "go": [
+      "go>line",
+      "line>words",
+      "words>pop",
+      "pop>active"
+     ],
+     "on": [
+      "active"
+     ],
+     "note": "旁边的小人、火苗、蒸汽，也一直在动"
+    },
+    {
+     "note": "每根线都在轻轻地抖，像手绘的动画"
+    },
+    {
+     "go": "active>exit",
+     "note": "这么好看，由谁来讲呢？"
+    }
    ]
   },
   {
@@ -79,31 +255,104 @@
    "sub": "也可以是你的",
    "tagline": "four voices + yours",
    "states": {
-    "s1": {"label": "蜡笔姐姐", "tag": "warm & bright", "pin": "pink"},
-    "s2": {"label": "图纸哥", "tag": "clear & calm", "pin": "blue"},
-    "s3": {"label": "元气少女", "tag": "sweet & lively", "pin": "straw"},
-    "s4": {"label": "老师傅", "tag": "slow & warm", "pin": "orange"},
-    "own": {"label": "你自己的声音", "tag": "your voice", "pin": "green"}
+    "s1": {
+     "label": "蜡笔姐姐",
+     "tag": "warm & bright",
+     "pin": "pink"
+    },
+    "s2": {
+     "label": "图纸哥",
+     "tag": "clear & calm",
+     "pin": "blue"
+    },
+    "s3": {
+     "label": "元气少女",
+     "tag": "sweet & lively",
+     "pin": "straw"
+    },
+    "s4": {
+     "label": "老师傅",
+     "tag": "slow & warm",
+     "pin": "orange"
+    },
+    "own": {
+     "label": "你自己的声音",
+     "tag": "your voice",
+     "pin": "green"
+    }
    },
    "start": "s1",
    "edges": [
-    {"from": "s1", "to": "s2", "label": "换一个"},
-    {"from": "s2", "to": "s3", "label": "再换"},
-    {"from": "s3", "to": "s4", "label": "再换"},
-    {"from": "s4", "to": "own", "label": "或者"},
-    {"from": "own", "to": "own", "label": "录十几秒", "if": "想用"}
+    {
+     "from": "s1",
+     "to": "s2",
+     "label": "换一个"
+    },
+    {
+     "from": "s2",
+     "to": "s3",
+     "label": "再换"
+    },
+    {
+     "from": "s3",
+     "to": "s4",
+     "label": "再换"
+    },
+    {
+     "from": "s4",
+     "to": "own",
+     "label": "或者"
+    },
+    {
+     "from": "own",
+     "to": "own",
+     "label": "录十几秒",
+     "if": "想用"
+    }
    ],
-   "exit": {"from": "own", "label": "发哪儿 ↓"},
+   "exit": {
+    "from": "own",
+    "label": "发哪儿 ↓"
+   },
    "steps": [
-    {"go": "entry", "note": "嗨，我是蜡笔姐姐，讲生活里的小事", "voice": "crayon-sister"},
-    {"go": "s1>s2", "note": "我是图纸哥，流程和原理交给我", "voice": "blueprint-guy"},
-    {"go": "s2>s3", "note": "我是元气少女，好玩的事我来讲", "voice": "sunny-girl"},
-    {"go": "s3>s4", "note": "我是老师傅，讲讲手艺和老行当", "voice": "old-master"},
-    {"note": "四个都是纯合成的声音，没有版权麻烦"},
-    {"go": "s4>own", "note": "也可以换成你自己的声音"},
-    {"go": "own>own", "note": "录十几秒，就能用上"},
-    {"note": "怎么加，主页的文章里有教程"},
-    {"go": "own>exit", "note": "做好了，能发到哪儿呢？"}
+    {
+     "go": "entry",
+     "note": "嗨，我是蜡笔姐姐，讲生活里的小事",
+     "voice": "crayon-sister"
+    },
+    {
+     "go": "s1>s2",
+     "note": "我是图纸哥，流程和原理交给我",
+     "voice": "blueprint-guy"
+    },
+    {
+     "go": "s2>s3",
+     "note": "我是元气少女，好玩的事我来讲",
+     "voice": "sunny-girl"
+    },
+    {
+     "go": "s3>s4",
+     "note": "我是老师傅，讲讲手艺和老行当",
+     "voice": "old-master"
+    },
+    {
+     "note": "四个都是纯合成的声音，没有版权麻烦"
+    },
+    {
+     "go": "s4>own",
+     "note": "也可以换成你自己的声音"
+    },
+    {
+     "go": "own>own",
+     "note": "录十几秒，就能用上"
+    },
+    {
+     "note": "怎么加，主页的文章里有教程"
+    },
+    {
+     "go": "own>exit",
+     "note": "做好了，能发到哪儿呢？"
+    }
    ]
   },
   {
@@ -111,33 +360,121 @@
    "sub": "比例和时长，随你说",
    "tagline": "3:4 · 9:16 · 16:9 · 1:1",
    "states": {
-    "default": {"label": "默认 3:4", "tag": "xiaohongshu", "pin": "pink"},
-    "tall": {"label": "9:16 竖屏", "tag": "douyin", "pin": "blue"},
-    "wide": {"label": "16:9 横屏", "tag": "widescreen", "pin": "green"},
-    "square": {"label": "1:1 方图", "tag": "square", "pin": "straw"},
-    "len": {"label": "两三分钟", "tag": "2-3 min", "pin": "orange"},
-    "custom": {"label": "说多长就多长", "tag": "your call", "pin": "violet"}
+    "default": {
+     "label": "默认 3:4",
+     "tag": "xiaohongshu",
+     "pin": "pink"
+    },
+    "tall": {
+     "label": "9:16 竖屏",
+     "tag": "douyin",
+     "pin": "blue"
+    },
+    "wide": {
+     "label": "16:9 横屏",
+     "tag": "widescreen",
+     "pin": "green"
+    },
+    "square": {
+     "label": "1:1 方图",
+     "tag": "square",
+     "pin": "straw"
+    },
+    "len": {
+     "label": "两三分钟",
+     "tag": "2-3 min",
+     "pin": "orange"
+    },
+    "custom": {
+     "label": "说多长就多长",
+     "tag": "your call",
+     "pin": "violet"
+    }
    },
    "start": "default",
    "edges": [
-    {"from": "default", "to": "tall", "label": "要竖屏"},
-    {"from": "default", "to": "wide", "label": "要横屏"},
-    {"from": "default", "to": "square", "label": "要方图"},
-    {"from": "tall", "to": "len"},
-    {"from": "wide", "to": "len"},
-    {"from": "square", "to": "len"},
-    {"from": "len", "to": "custom", "label": "说一声", "if": "想要一分钟"}
+    {
+     "from": "default",
+     "to": "tall",
+     "label": "要竖屏"
+    },
+    {
+     "from": "default",
+     "to": "wide",
+     "label": "要横屏"
+    },
+    {
+     "from": "default",
+     "to": "square",
+     "label": "要方图"
+    },
+    {
+     "from": "tall",
+     "to": "len"
+    },
+    {
+     "from": "wide",
+     "to": "len"
+    },
+    {
+     "from": "square",
+     "to": "len"
+    },
+    {
+     "from": "len",
+     "to": "custom",
+     "label": "说一声",
+     "if": "想要一分钟"
+    }
    ],
-   "exit": {"from": "custom", "label": "在哪儿用 ↓"},
+   "exit": {
+    "from": "custom",
+    "label": "在哪儿用 ↓"
+   },
    "steps": [
-    {"go": "entry", "note": "默认 3:4，正好铺满小红书", "say": "默认三比四，正好铺满小红书"},
-    {"go": "default>tall", "note": "要竖屏，就说 9:16", "say": "要竖屏，就说九比十六"},
-    {"go": "default>wide", "note": "要横屏，16:9 也行", "say": "要横屏，十六比九也行"},
-    {"go": "default>square", "note": "方图 1:1，什么比例都可以", "say": "方图一比一，什么比例都可以"},
-    {"go": ["tall>len", "wide>len", "square>len"], "on": ["len"], "note": "时长默认两到三分钟"},
-    {"note": "小红书 #AI玩家，抖音 #vive知识大赏", "say": "小红书、抖音，大多数平台都正合适"},
-    {"go": "len>custom", "note": "想要一分钟？直接告诉它"},
-    {"go": "custom>exit", "note": "那么，在哪儿能用呢？"}
+    {
+     "go": "entry",
+     "note": "默认 3:4，正好铺满小红书",
+     "say": "默认三比四，正好铺满小红书"
+    },
+    {
+     "go": "default>tall",
+     "note": "要竖屏，就说 9:16",
+     "say": "要竖屏，就说九比十六"
+    },
+    {
+     "go": "default>wide",
+     "note": "要横屏，16:9 也行",
+     "say": "要横屏，十六比九也行"
+    },
+    {
+     "go": "default>square",
+     "note": "方图 1:1，什么比例都可以",
+     "say": "方图一比一，什么比例都可以"
+    },
+    {
+     "go": [
+      "tall>len",
+      "wide>len",
+      "square>len"
+     ],
+     "on": [
+      "len"
+     ],
+     "note": "时长默认两到三分钟"
+    },
+    {
+     "note": "小红书 #AI玩家，抖音 #vive知识大赏",
+     "say": "小红书、抖音，大多数平台都正合适"
+    },
+    {
+     "go": "len>custom",
+     "note": "想要一分钟？直接告诉它"
+    },
+    {
+     "go": "custom>exit",
+     "note": "那么，在哪儿能用呢？"
+    }
    ]
   },
   {
@@ -145,40 +482,154 @@
    "sub": "主流 AI 助手里都能用",
    "tagline": "Codex · Claude Code · Grok · Muse",
    "states": {
-    "y1": {"label": "说一句话", "tag": "ask", "pin": "pink"},
-    "y2": {"label": "去喝杯茶", "tag": "tea time", "pin": "straw"},
-    "y3": {"label": "回来拿片", "tag": "pick up", "pin": "green"},
-    "a1": {"label": "拆成格子", "tag": "chart", "pin": "blue"},
-    "a2": {"label": "画上插画", "tag": "draw", "pin": "orange"},
-    "a3": {"label": "配好旁白", "tag": "voice", "pin": "violet"},
-    "a4": {"label": "片子做好", "tag": "film", "pin": "pink"},
-    "post": {"label": "发出去", "tag": "post", "pin": "red"}
+    "y1": {
+     "label": "说一句话",
+     "tag": "ask",
+     "pin": "pink"
+    },
+    "y2": {
+     "label": "去喝杯茶",
+     "tag": "tea time",
+     "pin": "straw"
+    },
+    "y3": {
+     "label": "回来拿片",
+     "tag": "pick up",
+     "pin": "green"
+    },
+    "a1": {
+     "label": "拆成格子",
+     "tag": "chart",
+     "pin": "blue"
+    },
+    "a2": {
+     "label": "画上插画",
+     "tag": "draw",
+     "pin": "orange"
+    },
+    "a3": {
+     "label": "配好旁白",
+     "tag": "voice",
+     "pin": "violet"
+    },
+    "a4": {
+     "label": "片子做好",
+     "tag": "film",
+     "pin": "pink"
+    },
+    "post": {
+     "label": "发出去",
+     "tag": "post",
+     "pin": "red"
+    }
    },
-   "regions": {"id": "both", "title": "同一时间", "lanes": [
-    {"id": "you", "title": "你", "tint": "rose", "states": ["y1", "y2", "y3"], "start": "y1"},
-    {"id": "ai", "title": "AI 助手", "tint": "sky", "states": ["a1", "a2", "a3", "a4"], "start": "a1"}
-   ]},
+   "regions": {
+    "id": "both",
+    "title": "同一时间",
+    "lanes": [
+     {
+      "id": "you",
+      "title": "你",
+      "tint": "rose",
+      "states": [
+       "y1",
+       "y2",
+       "y3"
+      ],
+      "start": "y1"
+     },
+     {
+      "id": "ai",
+      "title": "AI 助手",
+      "tint": "sky",
+      "states": [
+       "a1",
+       "a2",
+       "a3",
+       "a4"
+      ],
+      "start": "a1"
+     }
+    ]
+   },
    "edges": [
-    {"from": "y1", "to": "y2", "label": "交给它"},
-    {"from": "y2", "to": "y3", "label": "片子好了"},
-    {"from": "a1", "to": "a2", "label": "拆好了"},
-    {"from": "a2", "to": "a3", "label": "画好了"},
-    {"from": "a3", "to": "a4", "label": "配好了"},
-    {"from": "y3", "to": "post", "label": "一键发"}
+    {
+     "from": "y1",
+     "to": "y2",
+     "label": "交给它"
+    },
+    {
+     "from": "y2",
+     "to": "y3",
+     "label": "片子好了"
+    },
+    {
+     "from": "a1",
+     "to": "a2",
+     "label": "拆好了"
+    },
+    {
+     "from": "a2",
+     "to": "a3",
+     "label": "画好了"
+    },
+    {
+     "from": "a3",
+     "to": "a4",
+     "label": "配好了"
+    },
+    {
+     "from": "y3",
+     "to": "post",
+     "label": "一键发"
+    }
    ],
    "steps": [
-    {"go": "entry", "note": "你只要说一句话，就可以去喝茶了"},
-    {"go": "y1>y2", "note": "你喝茶的时候"},
-    {"go": "a1>a2", "note": "它在拆格子、画插画"},
-    {"go": "a2>a3", "note": "一句一句配好旁白"},
-    {"go": "a3>a4", "note": "片子、海报，全都做好"},
-    {"go": "y2>y3", "note": "你回来，正好拿片"},
-    {"go": "y3>post", "note": "直接发出去"},
-    {"note": "主流的 AI 助手里，都能用"},
-    {"note": "后面还会支持更多平台"},
-    {"note": "灵感来自 Ann Nguyen 老师", "say": "灵感来自安阮老师，谢谢她"},
-    {"note": "蜡笔状态图，马上就要发布了"},
-    {"note": "关注我，第一时间用上"}
+    {
+     "go": "entry",
+     "note": "你只要说一句话，就可以去喝茶了"
+    },
+    {
+     "go": "y1>y2",
+     "note": "你喝茶的时候"
+    },
+    {
+     "go": "a1>a2",
+     "note": "它在拆格子、画插画"
+    },
+    {
+     "go": "a2>a3",
+     "note": "一句一句配好旁白"
+    },
+    {
+     "go": "a3>a4",
+     "note": "片子、海报，全都做好"
+    },
+    {
+     "go": "y2>y3",
+     "note": "你回来，正好拿片"
+    },
+    {
+     "go": "y3>post",
+     "note": "直接发出去"
+    },
+    {
+     "note": "主流的 AI 助手里，都能用"
+    },
+    {
+     "note": "后面还会支持更多平台"
+    },
+    {
+     "note": "灵感来自 Ann Nguyen 老师",
+     "say": "灵感来自安阮老师，谢谢她"
+    },
+    {
+     "note": "格物 · 蜡笔状态图，马上发布",
+     "say": "格物，蜡笔状态图，马上就要发布了"
+    },
+    {
+     "note": "关注我，第一时间用上"
+    }
    ]
   }
  ]
