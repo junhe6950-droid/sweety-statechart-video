@@ -14,7 +14,7 @@ usage: scv.py <command> JOB [options]
   stills    JOB [--at t,..]   frames to work/stills/ + contact sheet (default: late in every step)
   render    JOB [--workers N] [--start S --end E]   frames -> work/render/video.mp4
   posters   JOB               finished posters -> outputs/posters/, outputs/cover.png
-  finalize  JOB               sound (voice / music / sfx) + mux -> outputs/film.mp4, captions.srt, script.txt
+  finalize  JOB               cover intro + sound -> outputs/film.mp4, shifted captions.srt, script.txt
   all       JOB               check, lines, voice, plan, render, posters, finalize
   batch     JOB [JOB...]      `all` for each job, then a summary
   voices                      list the voices
@@ -69,6 +69,7 @@ ENGINE_FILES = ['ink.js', 'theme.js', 'chart.js', 'layout.js', 'people.js', 'pro
 ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
 CAPTION_MAX = 24
 FPS = 30
+COVER_HOLD_SECONDS, COVER_FADE_SECONDS = .5, .5
 DIGITS = re.compile(r'\d')
 LEAD, GAP, CHAPTER_GAP, VOICE_AT = 1.0, .35, .25, .12
 DURATION_DEFAULT = (120.0, 180.0)              # 2-3 minutes: what most short-video feeds reward
@@ -171,6 +172,8 @@ def go_list(st):
 # ------------------------------------------------------------------ check
 def check(job, spec, quiet=False):
     errors, warnings = [], []
+    if not isinstance(spec.get('cover_intro', True), bool):
+        errors.append('cover_intro must be true or false')
     chapters = spec.get('chapters') or []
     if not chapters:
         errors.append('film.json has no chapters')
@@ -748,6 +751,12 @@ def srt_time(t):
 def finalize(job, spec):
     work, outd = job / 'work', job / 'outputs'
     outd.mkdir(exist_ok=True)
+    if not isinstance(spec.get('cover_intro', True), bool):
+        raise SystemExit('cover_intro must be true or false')
+    cover = outd / 'cover.png'
+    intro_seconds = COVER_HOLD_SECONDS + COVER_FADE_SECONDS if spec.get('cover_intro', True) else 0.
+    if intro_seconds and not cover.is_file():
+        raise SystemExit('cover intro needs outputs/cover.png: run `scv.py posters JOB` first (or set "cover_intro": false)')
     mix = sound(job, spec)
     video = work / 'render/video.mp4'
     timing = json.loads((work / 'timing.json').read_text())
@@ -757,11 +766,38 @@ def finalize(job, spec):
     else:  # a silent track, so every platform accepts the file
         audio = ['-f', 'lavfi', '-t', str(timing['duration']), '-i', 'anullsrc=r=48000:cl=stereo']
     comment = 'comment=AI-generated narration (VoxCPM2 designed voice)' if voice_of(spec) else 'comment=sweety-statechart-video'
-    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', str(video), *audio, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k',
-                    '-shortest', '-movflags', '+faststart', '-metadata', comment, str(dest)], check=True)
+    duration = round(timing['duration'] + intro_seconds, 3)
+    inputs = ['-i', str(video), *audio]
+    encoding = ['-map', '0:v', '-map', '1:a', '-c:v', 'copy']
+    if intro_seconds:
+        width, height, fps = timing['W'], timing['H'], timing['fps']
+        inputs += ['-loop', '1', '-framerate', str(fps), '-i', str(cover)]
+        filters = (
+            f'[2:v]scale={width}:{height}:force_original_aspect_ratio=decrease,'
+            f'pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps={fps},'
+            f'trim=duration={intro_seconds},setpts=PTS-STARTPTS,format=yuv420p,'
+            f'fade=t=out:st={COVER_HOLD_SECONDS}:d={COVER_FADE_SECONDS}[cover];'
+            f'[0:v]setpts=PTS-STARTPTS,setsar=1,fps={fps},format=yuv420p[body];'
+            '[cover][body]concat=n=2:v=1:a=0[video];'
+            f'[1:a]asetpts=PTS-STARTPTS,adelay={round(intro_seconds * 1000)}:all=1,'
+            f'apad,atrim=duration={duration}[audio]'
+        )
+        encoding = ['-filter_complex', filters, '-map', '[video]', '-map', '[audio]',
+                    '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-pix_fmt', 'yuv420p', '-r', str(fps)]
+    # Always build from the unprefixed render; repeated finalize calls must not stack intros or subtitle offsets.
+    pending = outd / '.film-finalizing.mp4'
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', *inputs, *encoding, '-c:a', 'aac', '-b:a', '192k',
+                    '-t', str(duration), '-shortest', '-movflags', '+faststart', '-metadata', comment, str(pending)], check=True)
+    pending.replace(dest)
     (outd / 'editing').mkdir(exist_ok=True)
-    rows = [f"{i + 1}\n{srt_time(s['t0'])} --> {srt_time(s['t1'])}\n{s['note']}\n" for i, s in enumerate(timing['steps']) if s['note']]
+    delivery_steps = [{**s, 't0': round(s['t0'] + intro_seconds, 3), 't1': round(s['t1'] + intro_seconds, 3)} for s in timing['steps']]
+    rows = [f"{i + 1}\n{srt_time(s['t0'])} --> {srt_time(s['t1'])}\n{s['note']}\n" for i, s in enumerate(delivery_steps) if s['note']]
     (outd / 'editing/captions.srt').write_text('\n'.join(rows))
+    (outd / 'editing/delivery-timing.json').write_text(json.dumps({
+        'duration': duration, 'body_offset_seconds': intro_seconds,
+        'cover_intro': {'hold_seconds': COVER_HOLD_SECONDS, 'fade_seconds': COVER_FADE_SECONDS} if intro_seconds else None,
+        'steps': delivery_steps,
+    }, ensure_ascii=False, indent=1))
     (outd / 'script.txt').write_text('\n'.join(f"{s['tag']}  {s['note']}" for s in timing['steps']))
     probe = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration,size', '-of', 'json', str(dest)], capture_output=True, text=True)
     print('delivered', dest, json.dumps(json.loads(probe.stdout or '{}').get('format', {})))

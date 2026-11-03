@@ -199,6 +199,15 @@
       return L;
     });
     let layouts = lay();
+    // a top-down chart that does not fit its poster (a long chain on a square frame) gets a taller poster; the camera
+    // then scrolls inside the chapter, as it does on wide frames
+    const needH = ls => Math.max(...ls.map((L, ci) => Math.max(0, ...Object.values(L.boxes).map(b => b.y + (b.h || 56) / 2),
+      ...L.edges.filter(e => e.kind !== 'exit' && e.kind !== 'entry').flatMap(e => e.pts.map(q => q[1])), ...L.edges.filter(e => e.lab && e.lab.box).map(e => e.lab.box.y1)) + (f.chapters[ci].exit ? 150 : 110)));
+    for (let k = 0, need = needH(layouts); k < 4 && need > f.H + 4 && f.H < f.W * 2.4; k++, need = needH(layouts)) {
+      const was = f.H;
+      f.H = Math.min(Math.round(f.W * 2.4), Math.ceil(Math.max(need, f.H * 1.08) / 50) * 50); layouts = lay();
+      f.warnings = (f.warnings || []).concat([`a chart did not fit its ${f.W}x${was} poster, so every poster is ${f.W}x${f.H} and the camera scrolls inside the chapter; split a long chapter to keep the frame's shape`]);
+    }
     if (f.flow === 'right') {                           // a left-to-right chain may need a wider poster: widen and lay out again
       const fr = f.size[1] / f.size[0];
       const needOf = ls => Math.max(...ls.map(L => Math.max(0, ...Object.values(L.boxes).map(b => b.x + b.w / 2), ...L.edges.flatMap(e => e.pts.map(q => q[0])), ...L.edges.filter(e => e.lab && e.lab.box).map(e => e.lab.box.x1)))) + 40;
@@ -227,7 +236,7 @@
       ch.boxAt = !ch.regions ? -1 : ch.S.list.findIndex(st => st.dots.some(d => d.startsWith('start:')) || st.on.some(x => lanes.includes(x)) || st.pass.some(x => lanes.includes(x)));
       ch.fixAt = ch.S.list.findIndex(st => st.fix);
     });
-    f.warnings = K.theme ? K.theme.audit() : [];
+    f.warnings = (K.theme ? K.theme.audit() : []).concat(f.warnings || []);
     return f;
   }
 
