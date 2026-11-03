@@ -1,0 +1,4 @@
+interface:
+  display_name: "蜡笔状态图短片"
+  short_description: "把一个流程做成会动的蜡笔状态图短片：3:4、逐步演示、四款旁白、每章一张海报"
+  default_prompt: "使用 $sweety-statechart-video，把这个流程或题目做成一部 2-3 分钟、带旁白的蜡笔状态图短片（默认 3:4），拆章、写字幕和插画，自动排版、配音、渲染，交付前逐帧自检。"

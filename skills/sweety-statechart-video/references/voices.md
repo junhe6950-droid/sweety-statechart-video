@@ -22,12 +22,44 @@
 ## 用法
 
 - **选声音**：`film.json` 里写 `"voice": "old-master"`，`scv.py voices` 列出所有可用声音。
-- **自己的声音**：个人声音库（`~/.local/share/sweety-handdraw-video/voices/catalog.json`）里的声音也能直接用，排在本项目四个之后查找。
+- **自己的声音**：见下面“加自己的声音”。sweety-handdraw-video 个人声音库里的声音也能直接用。
 - **生成**：`scv.py voice JOB` 逐句生成。
   - 每句先用固定种子；没过门禁或 ASR 就换下一个种子，最多四次；
   - 结果按内容缓存，改一句只重做那一句；
   - `--redo c2s03` 不要这一句的当前结果，换种子重来。
 - **数字**：VoxCPM2 不会读阿拉伯数字。字幕里有数字时，在全片 `say` 表或这一步的 `say` 里写出读法，例如 `"say": {"42": "四十二"}`。
+
+## 加自己的声音
+
+准备一段 8–15 秒的录音：
+
+- 只有一个人在说话；
+- 没有背景音乐，没有回声；
+- 在一句话的末尾结束。
+
+手机录音、会议录屏、视频都行，再写下这段里说的每一个字：
+
+```bash
+python3 scripts/scv.py add-voice my-voice --audio 录音.m4a --start 12.5 --end 25 \
+  --text "这段录音里说的每一个字，标点也写上。" --consent self --name 我的声音 --preview
+```
+
+这条命令依次：
+
+1. 切出这一段，检查长度；
+2. 查噪声、嗡声、削波和停顿；
+3. 用 Whisper 把这段听写出来，和你写的逐字稿逐字核对；
+4. 都通过了，存到 `~/.local/share/sweety-statechart-video/voices/my-voice/`；
+5. 加了 `--preview` 时，再用这个声音读一句试听，存在同目录的 `previews/my-voice.wav`。
+
+之后在 `film.json` 里写 `"voice": "my-voice"` 就能用。
+
+没通过时，它会说原因：
+
+- 噪声重：换一段更干净的；
+- 对不上：改逐字稿。
+
+`--consent` 只能是 `self`（本人）或 `authorized`（已获授权）。不要添加公众人物、主播或平台的声音。
 
 ## 重新设计
 

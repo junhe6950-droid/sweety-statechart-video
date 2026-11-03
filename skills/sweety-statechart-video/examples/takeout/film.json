@@ -4,41 +4,131 @@
  "language": "zh",
  "aspect": "3:4",
  "voice": "crayon-sister",
+ "duration": "1.5分钟",
  "chapters": [
   {
    "title": "一份订单",
    "sub": "从下单，到敲门",
    "tagline": "order · kitchen · doorstep",
    "states": {
-    "placed": {"label": "已下单", "tag": "order placed", "pin": "pink"},
-    "accepted": {"label": "商家接单", "tag": "accepted", "pin": "straw"},
-    "cooking": {"label": "出餐中", "tag": "in the kitchen", "pin": "orange"},
-    "refunded": {"label": "已退款", "tag": "refunded", "pin": "blue"},
-    "waiting": {"label": "待取餐", "tag": "ready", "pin": "straw"},
-    "delivering": {"label": "配送中", "tag": "on the way", "pin": "green"},
-    "arrived": {"label": "到你手上", "tag": "delivered", "pin": "pink"}
+    "placed": {
+     "label": "已下单",
+     "tag": "order placed",
+     "pin": "pink"
+    },
+    "accepted": {
+     "label": "商家接单",
+     "tag": "accepted",
+     "pin": "straw"
+    },
+    "cooking": {
+     "label": "出餐中",
+     "tag": "in the kitchen",
+     "pin": "orange"
+    },
+    "refunded": {
+     "label": "已退款",
+     "tag": "refunded",
+     "pin": "blue"
+    },
+    "waiting": {
+     "label": "待取餐",
+     "tag": "ready",
+     "pin": "straw"
+    },
+    "delivering": {
+     "label": "配送中",
+     "tag": "on the way",
+     "pin": "green"
+    },
+    "arrived": {
+     "label": "到你手上",
+     "tag": "delivered",
+     "pin": "pink"
+    }
    },
    "start": "placed",
    "edges": [
-    {"from": "placed", "to": "accepted", "label": "你付了钱"},
-    {"from": "accepted", "to": "cooking", "label": "后厨开火", "if": "有食材"},
-    {"from": "accepted", "to": "refunded", "label": "退钱", "if": "卖完了"},
-    {"from": "cooking", "to": "waiting", "label": "打包好了"},
-    {"from": "waiting", "to": "delivering", "label": "骑手取走"},
-    {"from": "delivering", "to": "delivering", "label": "等电梯", "if": "楼太高"},
-    {"from": "delivering", "to": "arrived", "label": "叮咚，开门"}
+    {
+     "from": "placed",
+     "to": "accepted",
+     "label": "你付了钱"
+    },
+    {
+     "from": "accepted",
+     "to": "cooking",
+     "label": "后厨开火",
+     "if": "有食材"
+    },
+    {
+     "from": "accepted",
+     "to": "refunded",
+     "label": "退钱",
+     "if": "卖完了"
+    },
+    {
+     "from": "cooking",
+     "to": "waiting",
+     "label": "打包好了"
+    },
+    {
+     "from": "waiting",
+     "to": "delivering",
+     "label": "骑手取走"
+    },
+    {
+     "from": "delivering",
+     "to": "delivering",
+     "label": "等电梯",
+     "if": "楼太高"
+    },
+    {
+     "from": "delivering",
+     "to": "arrived",
+     "label": "叮咚，开门"
+    }
    ],
-   "exit": {"from": "arrived", "label": "骑手这边呢 ↓"},
+   "exit": {
+    "from": "arrived",
+    "label": "骑手这边呢 ↓"
+   },
    "steps": [
-    {"go": "start", "note": "你在手机上，点了一碗牛肉面"},
-    {"go": "placed>accepted", "note": "付了钱，商家叮的一声接了单"},
-    {"go": "accepted>cooking", "note": "有食材，后厨马上开火"},
-    {"go": "accepted>refunded", "note": "要是卖完了，钱原路退回来"},
-    {"go": "cooking>waiting", "note": "面打包好，放在出餐口"},
-    {"go": "waiting>delivering", "note": "骑手取走，开始配送"},
-    {"go": "delivering>delivering", "note": "楼太高，还得等一趟电梯"},
-    {"go": "delivering>arrived", "note": "叮咚，面送到你手上"},
-    {"go": "arrived>exit", "note": "这一路，骑手又在忙什么？"}
+    {
+     "go": "start",
+     "note": "你在手机上，点了一碗牛肉面"
+    },
+    {
+     "go": "placed>accepted",
+     "note": "付了钱，商家叮的一声接了单"
+    },
+    {
+     "go": "accepted>cooking",
+     "note": "有食材，后厨马上开火"
+    },
+    {
+     "go": "accepted>refunded",
+     "note": "要是卖完了，钱原路退回来"
+    },
+    {
+     "go": "cooking>waiting",
+     "note": "面打包好，放在出餐口"
+    },
+    {
+     "go": "waiting>delivering",
+     "note": "骑手取走，开始配送"
+    },
+    {
+     "go": "delivering>delivering",
+     "note": "楼太高，还得等一趟电梯"
+    },
+    {
+     "go": "delivering>arrived",
+     "note": "叮咚，面送到你手上"
+    },
+    {
+     "go": "arrived>exit",
+     "note": "这一路，骑手又在忙什么？"
+    }
    ]
   },
   {
@@ -46,33 +136,130 @@
    "sub": "上线，接单，收工",
    "tagline": "online · pickup · drop-off",
    "states": {
-    "offline": {"label": "下线", "tag": "offline", "pin": "blue"},
-    "idle": {"label": "等单", "tag": "waiting", "pin": "straw"},
-    "pickup": {"label": "去取餐", "tag": "to the shop", "pin": "orange"},
-    "dropoff": {"label": "去送餐", "tag": "to your door", "pin": "green"},
-    "done": {"label": "收工", "tag": "home", "pin": "pink"}
+    "offline": {
+     "label": "下线",
+     "tag": "offline",
+     "pin": "blue"
+    },
+    "idle": {
+     "label": "等单",
+     "tag": "waiting",
+     "pin": "straw"
+    },
+    "pickup": {
+     "label": "去取餐",
+     "tag": "to the shop",
+     "pin": "orange"
+    },
+    "dropoff": {
+     "label": "去送餐",
+     "tag": "to your door",
+     "pin": "green"
+    },
+    "done": {
+     "label": "收工",
+     "tag": "home",
+     "pin": "pink"
+    }
    },
    "start": "offline",
-   "regions": {"id": "online", "lanes": [{"id": "app", "title": "在线接单", "tint": "mint", "states": ["idle", "pickup", "dropoff"], "start": "idle"}]},
+   "regions": {
+    "id": "online",
+    "lanes": [
+     {
+      "id": "app",
+      "title": "在线接单",
+      "tint": "mint",
+      "states": [
+       "idle",
+       "pickup",
+       "dropoff"
+      ],
+      "start": "idle"
+     }
+    ]
+   },
    "edges": [
-    {"from": "offline", "to": "online", "label": "早上九点"},
-    {"from": "idle", "to": "pickup", "label": "抢到一单"},
-    {"from": "pickup", "to": "dropoff", "label": "拿到餐"},
-    {"from": "dropoff", "to": "idle", "label": "送达"},
-    {"from": "idle", "to": "done", "label": "收工", "if": "十点没新单"},
-    {"from": "done", "to": "offline", "label": "车充好电"}
+    {
+     "from": "offline",
+     "to": "online",
+     "label": "早上九点"
+    },
+    {
+     "from": "idle",
+     "to": "pickup",
+     "label": "抢到一单"
+    },
+    {
+     "from": "pickup",
+     "to": "dropoff",
+     "label": "拿到餐"
+    },
+    {
+     "from": "dropoff",
+     "to": "idle",
+     "label": "送达"
+    },
+    {
+     "from": "idle",
+     "to": "done",
+     "label": "收工",
+     "if": "十点没新单"
+    },
+    {
+     "from": "done",
+     "to": "offline",
+     "label": "车充好电"
+    }
    ],
-   "exit": {"from": "done", "label": "同一时间 ↓"},
+   "exit": {
+    "from": "done",
+    "label": "同一时间 ↓"
+   },
    "steps": [
-    {"go": "start", "note": "早上，骑手还没上线"},
-    {"go": "offline>online", "note": "九点上线，打开接单软件"},
-    {"go": "idle>pickup", "note": "抢到一单，先去商家取餐"},
-    {"go": "pickup>dropoff", "note": "拿到餐，再赶去送给你"},
-    {"go": "dropoff>idle", "note": "送达，又回到等单"},
-    {"go": ["idle>pickup", "pickup>dropoff", "dropoff>idle"], "on": ["idle"], "note": "一整天，就在这三格里转圈"},
-    {"go": "idle>done", "note": "晚上十点没新单，收工"},
-    {"go": "done>offline", "note": "电车充好电，明天再来"},
-    {"go": "done>exit", "note": "可同一时间，后厨也没闲着"}
+    {
+     "go": "start",
+     "note": "早上，骑手还没上线"
+    },
+    {
+     "go": "offline>online",
+     "note": "九点上线，打开接单软件"
+    },
+    {
+     "go": "idle>pickup",
+     "note": "抢到一单，先去商家取餐"
+    },
+    {
+     "go": "pickup>dropoff",
+     "note": "拿到餐，再赶去送给你"
+    },
+    {
+     "go": "dropoff>idle",
+     "note": "送达，又回到等单"
+    },
+    {
+     "go": [
+      "idle>pickup",
+      "pickup>dropoff",
+      "dropoff>idle"
+     ],
+     "on": [
+      "idle"
+     ],
+     "note": "一整天，就在这三格里转圈"
+    },
+    {
+     "go": "idle>done",
+     "note": "晚上十点没新单，收工"
+    },
+    {
+     "go": "done>offline",
+     "note": "电车充好电，明天再来"
+    },
+    {
+     "go": "done>exit",
+     "note": "可同一时间，后厨也没闲着"
+    }
    ]
   },
   {
@@ -80,35 +267,135 @@
    "sub": "后厨和骑手，各忙各的",
    "tagline": "kitchen ‖ rider",
    "states": {
-    "kwait": {"label": "等单", "tag": "idle", "pin": "straw"},
-    "kcook": {"label": "做菜", "tag": "cooking", "pin": "orange"},
-    "kready": {"label": "出餐口有餐", "tag": "on the pass", "pin": "pink"},
-    "rgo": {"label": "赶往商家", "tag": "riding", "pin": "green"},
-    "rwait": {"label": "店里等餐", "tag": "waiting", "pin": "straw"},
-    "rcarry": {"label": "送餐中", "tag": "delivering", "pin": "blue"}
+    "kwait": {
+     "label": "等单",
+     "tag": "idle",
+     "pin": "straw"
+    },
+    "kcook": {
+     "label": "做菜",
+     "tag": "cooking",
+     "pin": "orange"
+    },
+    "kready": {
+     "label": "出餐口有餐",
+     "tag": "on the pass",
+     "pin": "pink"
+    },
+    "rgo": {
+     "label": "赶往商家",
+     "tag": "riding",
+     "pin": "green"
+    },
+    "rwait": {
+     "label": "店里等餐",
+     "tag": "waiting",
+     "pin": "straw"
+    },
+    "rcarry": {
+     "label": "送餐中",
+     "tag": "delivering",
+     "pin": "blue"
+    }
    },
-   "regions": {"id": "both", "title": "同一时间", "lanes": [
-    {"id": "kitchen", "title": "后厨", "tint": "sky", "states": ["kwait", "kcook", "kready"], "start": "kwait"},
-    {"id": "rider", "title": "骑手", "tint": "rose", "states": ["rgo", "rwait", "rcarry"], "start": "rgo"}
-   ]},
+   "regions": {
+    "id": "both",
+    "title": "同一时间",
+    "lanes": [
+     {
+      "id": "kitchen",
+      "title": "后厨",
+      "tint": "sky",
+      "states": [
+       "kwait",
+       "kcook",
+       "kready"
+      ],
+      "start": "kwait"
+     },
+     {
+      "id": "rider",
+      "title": "骑手",
+      "tint": "rose",
+      "states": [
+       "rgo",
+       "rwait",
+       "rcarry"
+      ],
+      "start": "rgo"
+     }
+    ]
+   },
    "edges": [
-    {"from": "kwait", "to": "kcook", "label": "来单了"},
-    {"from": "kcook", "to": "kready", "label": "装好盒"},
-    {"from": "kready", "to": "kwait", "label": "被取走"},
-    {"from": "rgo", "to": "rwait", "label": "到店"},
-    {"from": "rwait", "to": "rcarry", "label": "取到餐", "if": "出餐口有餐"},
-    {"from": "rcarry", "to": "rgo", "label": "接下一单"}
+    {
+     "from": "kwait",
+     "to": "kcook",
+     "label": "来单了"
+    },
+    {
+     "from": "kcook",
+     "to": "kready",
+     "label": "装好盒"
+    },
+    {
+     "from": "kready",
+     "to": "kwait",
+     "label": "被取走"
+    },
+    {
+     "from": "rgo",
+     "to": "rwait",
+     "label": "到店"
+    },
+    {
+     "from": "rwait",
+     "to": "rcarry",
+     "label": "取到餐",
+     "if": "出餐口有餐"
+    },
+    {
+     "from": "rcarry",
+     "to": "rgo",
+     "label": "接下一单"
+    }
    ],
-   "exit": {"from": "rcarry", "label": "路上太久呢 ↓"},
+   "exit": {
+    "from": "rcarry",
+    "label": "路上太久呢 ↓"
+   },
    "steps": [
-    {"go": "entry", "note": "后厨和骑手，同时在忙"},
-    {"go": "kwait>kcook", "note": "来单了，后厨开始做菜"},
-    {"go": "rgo>rwait", "note": "骑手赶到店里，等着出餐"},
-    {"go": "kcook>kready", "note": "装好盒，放到出餐口"},
-    {"go": "rwait>rcarry", "note": "出餐口有餐，骑手才取得到"},
-    {"go": "kready>kwait", "note": "餐被取走，后厨又等下一单"},
-    {"go": "rcarry>rgo", "note": "骑手送完，接着跑下一单"},
-    {"go": "rcarry>exit", "note": "可要是路上耽搁太久呢？"}
+    {
+     "go": "entry",
+     "note": "后厨和骑手，同时在忙"
+    },
+    {
+     "go": "kwait>kcook",
+     "note": "来单了，后厨开始做菜"
+    },
+    {
+     "go": "rgo>rwait",
+     "note": "骑手赶到店里，等着出餐"
+    },
+    {
+     "go": "kcook>kready",
+     "note": "装好盒，放到出餐口"
+    },
+    {
+     "go": "rwait>rcarry",
+     "note": "出餐口有餐，骑手才取得到"
+    },
+    {
+     "go": "kready>kwait",
+     "note": "餐被取走，后厨又等下一单"
+    },
+    {
+     "go": "rcarry>rgo",
+     "note": "骑手送完，接着跑下一单"
+    },
+    {
+     "go": "rcarry>exit",
+     "note": "可要是路上耽搁太久呢？"
+    }
    ]
   },
   {
@@ -116,35 +403,125 @@
    "sub": "检查器找到一条坏路",
    "tagline": "a rule, and the path that breaks it",
    "states": {
-    "fresh": {"label": "刚出锅", "tag": "fresh", "pin": "straw"},
-    "warm": {"label": "还热着", "tag": "+10 min", "pin": "orange"},
-    "cool": {"label": "变温了", "tag": "+20 min", "pin": "blue"},
-    "soggy": {"label": "坨了", "tag": "+30 min", "pin": "red"},
-    "redo": {"label": "重做一碗", "tag": "redo", "pin": "green"},
-    "served": {"label": "坨面送到", "tag": "served soggy", "pin": "red"}
+    "fresh": {
+     "label": "刚出锅",
+     "tag": "fresh",
+     "pin": "straw"
+    },
+    "warm": {
+     "label": "还热着",
+     "tag": "+10 min",
+     "pin": "orange"
+    },
+    "cool": {
+     "label": "变温了",
+     "tag": "+20 min",
+     "pin": "blue"
+    },
+    "soggy": {
+     "label": "坨了",
+     "tag": "+30 min",
+     "pin": "red"
+    },
+    "redo": {
+     "label": "重做一碗",
+     "tag": "redo",
+     "pin": "green"
+    },
+    "served": {
+     "label": "坨面送到",
+     "tag": "served soggy",
+     "pin": "red"
+    }
    },
    "start": "fresh",
-   "rule": {"never": "served", "stamp": "规则被打破"},
+   "rule": {
+    "never": "served",
+    "stamp": "规则被打破"
+   },
    "edges": [
-    {"from": "fresh", "to": "warm", "label": "过了十分钟"},
-    {"from": "warm", "to": "cool", "label": "又过十分钟"},
-    {"from": "cool", "to": "soggy", "label": "再过十分钟"},
-    {"from": "soggy", "to": "soggy", "label": "堵在路上"},
-    {"from": "soggy", "to": "redo", "label": "被发现了"},
-    {"from": "redo", "to": "fresh", "label": "重新下锅"},
-    {"from": "soggy", "to": "served", "label": "照样送出", "if": "没人检查"}
+    {
+     "from": "fresh",
+     "to": "warm",
+     "label": "过了十分钟"
+    },
+    {
+     "from": "warm",
+     "to": "cool",
+     "label": "又过十分钟"
+    },
+    {
+     "from": "cool",
+     "to": "soggy",
+     "label": "再过十分钟"
+    },
+    {
+     "from": "soggy",
+     "to": "soggy",
+     "label": "堵在路上"
+    },
+    {
+     "from": "soggy",
+     "to": "redo",
+     "label": "被发现了"
+    },
+    {
+     "from": "redo",
+     "to": "fresh",
+     "label": "重新下锅"
+    },
+    {
+     "from": "soggy",
+     "to": "served",
+     "label": "照样送出",
+     "if": "没人检查"
+    }
    ],
    "steps": [
-    {"go": "entry", "note": "面刚出锅，最好吃"},
-    {"go": "fresh>warm", "note": "过了十分钟，还热着"},
-    {"go": "warm>cool", "note": "又过十分钟，变温了"},
-    {"go": "cool>soggy", "note": "再过十分钟，面坨了"},
-    {"go": "soggy>soggy", "note": "偏偏又堵在路上"},
-    {"go": ["soggy>redo", "redo>fresh"], "on": ["fresh"], "note": "被发现了，就重做一碗"},
-    {"go": "soggy>served", "note": "可要是没人检查，照样送出"},
-    {"trace": true, "note": "检查器顺着红线，找到这条坏路"},
-    {"note": "加一道出餐检查，就能堵上"},
-    {"note": "下次等外卖，你知道它在哪一格了"}
+    {
+     "go": "entry",
+     "note": "面刚出锅，最好吃"
+    },
+    {
+     "go": "fresh>warm",
+     "note": "过了十分钟，还热着"
+    },
+    {
+     "go": "warm>cool",
+     "note": "又过十分钟，变温了"
+    },
+    {
+     "go": "cool>soggy",
+     "note": "再过十分钟，面坨了"
+    },
+    {
+     "go": "soggy>soggy",
+     "note": "偏偏又堵在路上"
+    },
+    {
+     "go": [
+      "soggy>redo",
+      "redo>fresh"
+     ],
+     "on": [
+      "fresh"
+     ],
+     "note": "被发现了，就重做一碗"
+    },
+    {
+     "go": "soggy>served",
+     "note": "可要是没人检查，照样送出"
+    },
+    {
+     "trace": true,
+     "note": "检查器顺着红线，找到这条坏路"
+    },
+    {
+     "note": "加一道出餐检查，就能堵上"
+    },
+    {
+     "note": "下次等外卖，你知道它在哪一格了"
+    }
    ]
   }
  ]

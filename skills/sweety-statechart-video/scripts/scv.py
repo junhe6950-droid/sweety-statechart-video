@@ -17,6 +17,8 @@ usage: scv.py <command> JOB [options]
   all       JOB               check, lines, voice, plan, render, posters, finalize
   batch     JOB [JOB...]      `all` for each job, then a summary
   voices                      list the voices
+  add-voice ID --audio F --text T --consent self|authorized [--start S --end E] [--preview]
+                              add your own voice (scripts/add_voice.py)
 """
 import argparse
 import base64
@@ -37,15 +39,88 @@ ENGINE = SKILL / 'engine'
 CRAYON = ENGINE / 'crayon'
 FONTS = ENGINE / 'fonts'
 SCRIPTS = SKILL / 'scripts'
-RENDER_PY = os.environ.get('SCV_PYTHON', str(Path.home() / '.local/share/sweety-handdraw-video/venv/bin/python'))
+OWN_VENV = Path.home() / '.local/share/sweety-statechart-video/venv/bin/python'      # made by scripts/setup.sh
+RENDER_PY = os.environ.get('SCV_PYTHON') or str(OWN_VENV if OWN_VENV.exists() else Path.home() / '.local/share/sweety-handdraw-video/venv/bin/python')
 MLX_PY = os.environ.get('STATECHART_MLX_PYTHON', str(Path.home() / '.local/share/voxcpm2-mlx/.venv/bin/python3'))
-ASPECTS = {'3:4': (1080, 1440), '1:1': (1080, 1080), '4:5': (1080, 1350), '9:16': (1080, 1920), '16:9': (1920, 1080), '2:3': (1080, 1620)}
+ASPECT_RE = re.compile(r'^\s*(\d+(?:\.\d+)?)\s*[:：x×/]\s*(\d+(?:\.\d+)?)\s*$')
+RATIO_LIMITS = (0.4, 2.5)                       # height / width
+
+
+def aspect_ratio(text):
+    """'3:4', '16:9', '2.35:1', '4x5', '9／16' -> height / width, or None when unreadable or too extreme."""
+    m = ASPECT_RE.match(str(text or '3:4').replace('／', '/'))
+    if not m or float(m[1]) <= 0 or float(m[2]) <= 0:
+        return None
+    r = float(m[2]) / float(m[1])
+    return r if RATIO_LIMITS[0] <= r <= RATIO_LIMITS[1] else None
+
+
+def frame_size(spec):
+    """(W, H) in pixels: an explicit "size", or the aspect with the short side at 1080 (both sides even)."""
+    if spec.get('size'):
+        w, h = spec['size']
+        return int(w) // 2 * 2, int(h) // 2 * 2
+    r = aspect_ratio(spec.get('aspect', '3:4')) or 4 / 3
+    if r >= 1:
+        return 1080, round(1080 * r / 2) * 2
+    return round(1080 / r / 2) * 2, 1080
 ENGINE_FILES = ['ink.js', 'chart.js', 'layout.js', 'people.js', 'props.js', 'film.js', 'player.js', 'main.js']
 ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
 CAPTION_MAX = 24
 FPS = 30
 DIGITS = re.compile(r'\d')
 LEAD, GAP, CHAPTER_GAP, VOICE_AT = 1.0, .35, .25, .12
+DURATION_DEFAULT = (120.0, 180.0)              # 2-3 minutes: what most short-video feeds reward
+MAX_STRETCH = .7                                # at most this much extra hold per step to reach the target
+SPOKEN = re.compile(r'[，。！？；：、“”‘’（）《》〈〉【】—…·,.!?;:"\'()\[\]\s↓→]')
+
+
+def target_duration(spec):
+    """(min, max) seconds from "duration": 150 | [120, 180] | "2-3分钟" | "90秒" | "1.5 min"; default 2-3 minutes."""
+    d = spec.get('duration')
+    if d is None:
+        return DURATION_DEFAULT if voice_of(spec) else (0., 1e9)   # a silent film keeps the reference's brisk pace
+    if isinstance(d, (int, float)):
+        return (d * .9, d * 1.1)
+    if isinstance(d, (list, tuple)) and len(d) == 2:
+        return (float(d[0]), float(d[1]))
+    text = str(d).lower()
+    nums = [float(x) for x in re.findall(r'\d+(?:\.\d+)?', text)]
+    if not nums:
+        return DURATION_DEFAULT
+    unit = 60 if re.search(r'分|min|m\b', text) else 1
+    lo, hi = (nums[0], nums[1]) if len(nums) > 1 else (nums[0] * .9, nums[0] * 1.1)
+    return (lo * unit, hi * unit)
+
+
+def voice_rate(spec):
+    """characters per second of the film's voice (from the catalog; 5 when unknown)."""
+    v = voice_of(spec)
+    if not v:
+        return None
+    try:
+        sys.path.insert(0, str(SCRIPTS))
+        import audio_env
+        return float(audio_env.voice_profile(v).get('chars_per_second') or 5.0)
+    except SystemExit:
+        return 5.0
+
+
+def estimate_seconds(spec):
+    """film length before any voice exists: the animation of each step, or its line read at the voice's pace."""
+    sp, rate = speed_of(spec), voice_rate(spec)
+    anim, allsteps, t = 3.6 / sp, steps_of(spec), LEAD
+    for n, (ci, si, st) in enumerate(allsteps):
+        d = anim
+        if rate:
+            chars = len(SPOKEN.sub('', st.get('say') or st.get('note') or ''))
+            if chars:
+                d = max(anim, VOICE_AT + chars / rate + .05 + GAP)
+        if n + 1 == len(allsteps) or allsteps[n + 1][0] != ci:
+            d += CHAPTER_GAP
+        d += float(st.get('hold') or 0)
+        t += d
+    return t + 2.5 / sp + .8
 
 
 def load(job):
@@ -95,8 +170,8 @@ def check(job, spec, quiet=False):
     chapters = spec.get('chapters') or []
     if not chapters:
         errors.append('film.json has no chapters')
-    if spec.get('aspect', '3:4') not in ASPECTS:
-        errors.append(f"aspect {spec.get('aspect')} not one of {', '.join(ASPECTS)}")
+    if not spec.get('size') and aspect_ratio(spec.get('aspect', '3:4')) is None:
+        errors.append(f"aspect {spec.get('aspect')!r}: write it as W:H (for example 3:4, 9:16, 16:9, 4:5, 2.35:1), height/width between {RATIO_LIMITS[0]} and {RATIO_LIMITS[1]}")
     for ci, ch in enumerate(chapters):
         where = f'chapter {ci + 1} ({ch.get("title", "")})'
         states = ch.get('states') or {}
@@ -137,6 +212,14 @@ def check(job, spec, quiet=False):
             note = st.get('note') or ''
             if len(note) > CAPTION_MAX:
                 warnings.append(f'{where} step {si + 1}: caption has {len(note)} characters (keep to {CAPTION_MAX}): {note}')
+            if st.get('voice'):
+                try:
+                    sys.path.insert(0, str(SCRIPTS))
+                    import audio_env
+                    if st['voice'] not in audio_env.voice_ids():
+                        errors.append(f"{where} step {si + 1}: voice {st['voice']!r} unknown")
+                except SystemExit:
+                    pass
             said = st.get('say') or note
             if voice_of(spec) and DIGITS.search(said) and not any(k in said for k in (spec.get('say') or {})):
                 warnings.append(f'{where} step {si + 1}: digits in a narrated line; add a "say" reading (VoxCPM2 does not read digits): {note}')
@@ -171,6 +254,15 @@ def check(job, spec, quiet=False):
                 warnings.append(f"{where}: stuck combinations (no way out): {multi[:3]}")
     if not (job / 'scenes.js').exists():
         warnings.append('no scenes.js: the posters will have no pictures (see references/scenes.md)')
+    if chapters and not errors:
+        est, (lo, hi) = estimate_seconds(spec), target_duration(spec)
+        nsteps = max(1, len(steps_of(spec)))
+        per = est / nsteps
+        if est < lo * .95:
+            warnings.append(f'length: about {est:.0f} s, target {lo:.0f}-{hi:.0f} s. Add about {int((lo - est) / per) + 1} steps '
+                            f'(another chapter, or 2-3 more steps per chapter), or give lines more words; or set "duration"')
+        elif est > hi * 1.05:
+            warnings.append(f'length: about {est:.0f} s, target {lo:.0f}-{hi:.0f} s. Cut about {int((est - hi) / per) + 1} steps or shorten lines; or set "duration"')
     v = voice_of(spec)
     if v:
         try:
@@ -181,8 +273,11 @@ def check(job, spec, quiet=False):
         except SystemExit as e:
             warnings.append(f'voice catalog: {e}')
     res = {'errors': errors, 'warnings': warnings, 'model': model}
+    if chapters and not errors:
+        lo, hi = target_duration(spec)
+        res['length'] = {'estimate_seconds': round(estimate_seconds(spec), 1), 'target_seconds': [round(lo), round(hi)], 'steps': len(steps_of(spec))}
     if not quiet:
-        print(json.dumps({'errors': errors, 'warnings': warnings}, ensure_ascii=False, indent=1))
+        print(json.dumps({k: res[k] for k in ('errors', 'warnings', 'length') if k in res}, ensure_ascii=False, indent=1))
     return res
 
 
@@ -190,6 +285,7 @@ def resolved(spec):
     """film.json as the page needs it: rule paths filled in by the checker."""
     s = json.loads(json.dumps(spec))
     modelcheck.apply_found_paths(s)
+    s['size'] = list(frame_size(spec))
     return s
 
 
@@ -220,7 +316,7 @@ def write_page(job, spec, mode='play', timing=None, opts=None):
             "window.SCENES = window.SCENES || {};\n")
     (work / f'data-{mode}.js').write_text(data)
     scenes = (job / 'scenes.js').as_uri() if (job / 'scenes.js').exists() else None
-    W, H = ASPECTS[spec.get('aspect', '3:4')]
+    W, H = frame_size(spec)
     tags = '\n'.join(f'<script src="{(CRAYON / f).as_uri()}"></script>' for f in ENGINE_FILES[:-1])
     html = f"""<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="fonts.css">
 <style>html,body{{margin:0;background:#e9e3d6}} canvas{{display:block}}</style></head><body>
@@ -244,7 +340,11 @@ def need_render_python():
 
 
 def open_page(p, page_html, W=1080, H=1440, timeout=180000):
-    b = p.chromium.launch(channel='chrome', args=['--allow-file-access-from-files', '--disable-web-security'])
+    args = ['--allow-file-access-from-files', '--disable-web-security']
+    try:
+        b = p.chromium.launch(channel='chrome', args=args)          # the installed Google Chrome
+    except Exception:
+        b = p.chromium.launch(args=args)                            # or Playwright's own Chromium (setup.sh installs it)
     pg = b.new_page(viewport={'width': W, 'height': H}, device_scale_factor=1)
     errors = []
     pg.on('pageerror', lambda e: errors.append(str(e)))
@@ -284,7 +384,7 @@ def layout(job, spec):
     page = write_page(job, spec, 'layout')
     out = job / 'work/layout'
     out.mkdir(parents=True, exist_ok=True)
-    W, H = ASPECTS[spec.get('aspect', '3:4')]
+    W, H = frame_size(spec)
     with sync_playwright() as p:
         b, pg, errors = open_page(p, page, W, H)
         rep = pg.evaluate('layoutReport()')
@@ -318,6 +418,8 @@ def write_lines(job, spec):
         item = {'id': line_id(ci, si), 'text': text or st['say']}
         if st.get('say'):
             item['say'] = st['say']
+        if st.get('voice'):
+            item['voice'] = st['voice']
         lines.append(item)
     out = {'language': spec.get('language', 'zh'), 'voice': v, 'say': spec.get('say') or {}, 'lines': lines}
     if spec.get('voxcpm'):
@@ -367,8 +469,22 @@ def plan(job, spec):
                       'note': st.get('note') or '', 'tag': f"{ROMAN[ci]}.{si + 1}"})
         t += d
     total = round(t + .4, 3)
-    W, H = ASPECTS[spec.get('aspect', '3:4')]
-    timing = {'W': W, 'H': H, 'fps': int(spec.get('fps', FPS)), 'speed': sp, 'lead': LEAD, 'duration': total, 'total': total, 'voice': v, 'steps': steps}
+    lo, hi = target_duration(spec)
+    stretch = 0.
+    if total < lo and steps:
+        stretch = min(MAX_STRETCH, (lo - total) / len(steps))
+        shift = 0.
+        for s_ in steps:
+            s_['t0'] = round(s_['t0'] + shift, 3)
+            s_['dur'] = round(s_['dur'] + stretch, 3)
+            s_['t1'] = round(s_['t0'] + s_['dur'], 3)
+            shift += stretch
+        for line in lines:
+            k = next(i for i, s_ in enumerate(steps) if s_['id'] == line['id'])
+            line['at'] = round(steps[k]['t0'] + VOICE_AT, 3)
+        total = round(total + shift, 3)
+    W, H = frame_size(spec)
+    timing = {'W': W, 'H': H, 'fps': int(spec.get('fps', FPS)), 'speed': sp, 'lead': LEAD, 'duration': total, 'total': total, 'voice': v, 'target': [lo, hi], 'steps': steps}
     (job / 'work').mkdir(exist_ok=True)
     (job / 'work/timing.json').write_text(json.dumps(timing, ensure_ascii=False, indent=1))
     sfx = [{'kind': 'pop', 'at': round(s['t0'] + .9 / sp, 3), 'gain_db': -6} for s in steps] if spec.get('sfx') else []
@@ -376,7 +492,11 @@ def plan(job, spec):
     if isinstance(music, str):
         music = {'mood': music}
     (job / 'work/timeline.json').write_text(json.dumps({'duration': total, 'lines': lines, 'music': music, 'sfx': sfx}, ensure_ascii=False, indent=1))
-    print(f'plan: {len(steps)} steps, {total:.1f} s at speed {sp:g}' + (f', {len(lines)} narrated lines' if lines else ', silent'))
+    print(f'plan: {len(steps)} steps, {total:.1f} s at speed {sp:g}' + (f', {len(lines)} narrated lines' if lines else ', silent')
+          + (f', +{stretch:.2f} s hold per step toward the target' if stretch else ''))
+    if total < lo - 1 or total > hi + 1:
+        print(f'note: {total:.0f} s is outside the target {lo:.0f}-{hi:.0f} s ("duration" in film.json); '
+              + ('add steps or a chapter' if total < lo else 'cut steps') + ' to land inside it')
     return timing
 
 
@@ -419,7 +539,7 @@ def posters(job, spec):
     page = write_page(job, spec, 'play', page_timing(timing) if timing else None)
     out = job / 'outputs/posters'
     out.mkdir(parents=True, exist_ok=True)
-    W, H = ASPECTS[spec.get('aspect', '3:4')]
+    W, H = frame_size(spec)
     files = []
     with sync_playwright() as p:
         b, pg, errors = open_page(p, page, W, H)
@@ -643,6 +763,9 @@ def list_voices():
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == 'add-voice':         # its own options; handled by add_voice.py
+        run_py('add_voice.py', *sys.argv[2:], python=MLX_PY if Path(MLX_PY).exists() else None)
+        return
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('cmd')
     ap.add_argument('jobs', nargs='*')

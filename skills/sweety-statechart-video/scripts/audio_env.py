@@ -18,6 +18,7 @@ import sys
 
 HOME = Path.home()
 SKILL_CATALOG = Path(__file__).resolve().parent.parent / 'assets' / 'voices' / 'catalog.json'
+USER_CATALOG = Path(os.environ.get('STATECHART_USER_VOICES', HOME / '.local/share/sweety-statechart-video/voices/catalog.json')).expanduser()
 DEFAULT_VOICE = 'crayon-sister'
 LOCAL_VOXCPM = HOME / '.local/share/voxcpm2-mlx/models/VoxCPM2-8bit'   # default install place (a symlink is fine)
 MLX_PYTHON = Path(os.environ.get('STATECHART_MLX_PYTHON', HOME / '.local/share/voxcpm2-mlx/.venv/bin/python3')).expanduser()
@@ -67,13 +68,14 @@ def whisper_model():
 
 
 def catalogs():
-    """(catalog path, catalog) pairs: the skill's own designed voices first, then the personal library."""
+    """(catalog path, catalog) pairs: the skill's own designed voices, then voices you added (add_voice.py), then the
+    sweety-handdraw-video personal library."""
     found = []
-    for path in (SKILL_CATALOG, VOICE_CATALOG):
+    for path in (SKILL_CATALOG, USER_CATALOG, VOICE_CATALOG):
         if path.is_file():
             found.append((path, json.loads(path.read_text())))
     if not found:
-        raise SystemExit(f'No voice catalog: {SKILL_CATALOG} or {VOICE_CATALOG}')
+        raise SystemExit(f'No voice catalog: {SKILL_CATALOG}, {USER_CATALOG} or {VOICE_CATALOG}')
     return found
 
 

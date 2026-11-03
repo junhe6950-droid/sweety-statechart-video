@@ -48,7 +48,8 @@
    },
    "preferred_engine": "voxcpm",
    "redistribution": "Distributable: generated with Apache-2.0 VoxCPM2 weights; label as AI-generated when published",
-   "acceptance": "pending_listening"
+   "acceptance": "pending_listening",
+   "chars_per_second": 4.9
   },
   {
    "id": "blueprint-guy",
@@ -96,7 +97,8 @@
    },
    "preferred_engine": "voxcpm",
    "redistribution": "Distributable: generated with Apache-2.0 VoxCPM2 weights; label as AI-generated when published",
-   "acceptance": "pending_listening"
+   "acceptance": "pending_listening",
+   "chars_per_second": 5.5
   },
   {
    "id": "sunny-girl",
@@ -144,7 +146,8 @@
    },
    "preferred_engine": "voxcpm",
    "redistribution": "Distributable: generated with Apache-2.0 VoxCPM2 weights; label as AI-generated when published",
-   "acceptance": "pending_listening"
+   "acceptance": "pending_listening",
+   "chars_per_second": 5.0
   },
   {
    "id": "old-master",
@@ -192,7 +195,8 @@
    },
    "preferred_engine": "voxcpm",
    "redistribution": "Distributable: generated with Apache-2.0 VoxCPM2 weights; label as AI-generated when published",
-   "acceptance": "pending_listening"
+   "acceptance": "pending_listening",
+   "chars_per_second": 3.7
   }
  ]
 }

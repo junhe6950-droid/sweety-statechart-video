@@ -164,7 +164,9 @@ def chart_of(ch):
         regs = {'id': regs.get('id') or 'together', 'lanes': [{'id': l['id'], 'states': l['states'], 'initial': l.get('start') or l['states'][0]} for l in regs['lanes']]}
         lanes = regs['lanes']
     inner = {s for l in lanes for s in l['states']}
-    start = ch.get('start') or (regs['id'] if regs and all(s in inner for s in states) else (states[0] if states else None))
+    outer = [s for s in states if s not in inner]
+    roots = [s for s in outer if not any(e['to'] == s and e['from'] != s for e in ch.get('edges') or [])]
+    start = ch.get('start') or (regs['id'] if regs and not roots else (roots[0] if roots else (states[0] if states else None)))
     T = [{'from': '*', 'to': start}] if start else []
     T += [{'from': e['from'], 'to': e['to']} for e in ch.get('edges') or []]
     if ch.get('exit'):

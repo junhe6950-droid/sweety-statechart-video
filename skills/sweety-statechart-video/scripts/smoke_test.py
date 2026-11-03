@@ -17,7 +17,23 @@ def run(*args):
     return r.stdout + r.stderr
 
 
+def units():
+    sys.path.insert(0, str(SKILL / 'scripts'))
+    import scv
+    assert scv.frame_size({'aspect': '3:4'}) == (1080, 1440)
+    assert scv.frame_size({'aspect': '16:9'}) == (1920, 1080)
+    assert scv.frame_size({'aspect': '2.35:1'}) == (2538, 1080)
+    assert scv.frame_size({'aspect': '9／16'}) == (1080, 1920)
+    assert scv.aspect_ratio('1:9') is None and scv.aspect_ratio('abc') is None
+    assert scv.target_duration({'voice': 'crayon-sister'}) == (120, 180)
+    assert scv.target_duration({'voice': 'none'})[1] > 1e8
+    assert scv.target_duration({'duration': '1分钟'}) == (54, 66)
+    assert scv.target_duration({'duration': '2-3分钟'}) == (120, 180)
+    assert scv.target_duration({'duration': [60, 90]}) == (60, 90)
+
+
 def main():
+    units()
     tmp = Path(tempfile.mkdtemp(prefix='scv-smoke-'))
     job = tmp / 'takeout'
     job.mkdir()

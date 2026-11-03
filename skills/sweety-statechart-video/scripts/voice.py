@@ -288,6 +288,9 @@ def caption_chars(text, reading, segments, words, duration):
 
 # ------------------------------------------------------------------------------------------- engine
 
+_MODELS = {}
+
+
 class Engine:
     """VoxCPM2 (MLX) with the voice's reference; loaded on first use."""
     def __init__(self, profile, overrides):
@@ -322,7 +325,10 @@ class Engine:
         if self.model is None:
             from mlx_audio.tts.utils import load
             started = time.time()
-            self.model = load(str(self.model_path.resolve()))
+            key = str(self.model_path.resolve())
+            if key not in _MODELS:                 # several voices in one film share one loaded model
+                _MODELS[key] = load(key)
+            self.model = _MODELS[key]
             if self.enhancement:
                 from mlx_audio.sts.models.deepfilternet import DeepFilterNetModel
                 self.cleaner = DeepFilterNetModel.from_pretrained(self.enhancement, subfolder=None)
@@ -460,7 +466,7 @@ def load_lines(job):
             raise SystemExit(f'lines.json line {identifier}: say must be a reading string or a map')
         reading, segments = reading_of(text, global_map, say)
         seen.add(identifier)
-        lines.append({'id': identifier, 'text': text, 'reading': reading, 'segments': segments})
+        lines.append({'id': identifier, 'text': text, 'reading': reading, 'segments': segments, 'voice': line.get('voice')})
     if not lines:
         raise SystemExit('lines.json has no lines')
     return spec, lines
@@ -569,6 +575,14 @@ def main():
 
     profile = audio_env.voice_profile(spec.get('voice') or audio_env.DEFAULT_VOICE)
     engine = Engine(profile, spec.get('voxcpm') or {})
+    engines = {profile['id']: engine}
+
+    def engine_for(line):                          # a line may name its own voice (dialogue, voice showcases)
+        vid = line.get('voice') or profile['id']
+        if vid not in engines:
+            engines[vid] = Engine(audio_env.voice_profile(vid), spec.get('voxcpm') or {})
+        return engines[vid]
+    main_engine = engine
     whisper = None if arguments.no_asr else Whisper(whisper_dir, spec.get('language', 'zh'))
 
     if arguments.probe_terms:
@@ -595,6 +609,7 @@ def main():
     entries, failed, totals = {}, {}, {'synthesized': 0, 'reused': 0, 'failed': 0}
     for line in lines:
         identifier, reading = line['id'], line['reading']
+        engine = engine_for(line)
         if only and identifier not in only:
             kept_entry = (previous.get('lines') or {}).get(identifier)
             if kept_entry and kept_entry.get('reading') == reading and kept_entry.get('text') == line['text'] and (out_dir / f'{identifier}.wav').is_file():
@@ -660,7 +675,7 @@ def main():
         shutil.copyfile(take_path, out_dir / f'{identifier}.wav')
         chars, why = (caption_chars(line['text'], reading, line['segments'], record['words'], record['dur'])
                       if record.get('words') else (None, 'no ASR timestamps'))
-        entries[identifier] = {'dur': record['dur'], 'text': line['text'], 'reading': reading, 'asr': record.get('asr'),
+        entries[identifier] = {'dur': record['dur'], 'text': line['text'], 'reading': reading, 'voice': engine.identity['voice'], 'asr': record.get('asr'),
                                'cer': record.get('cer'), 'seed': record['seed'], 'chars': chars,
                                **{key: record[key] for key in ('matched_by', 'pinyin_cer') if key in record},
                                **({'chars_note': why} if chars is None else {}),
@@ -673,7 +688,8 @@ def main():
         for stale in out_dir.glob('*.wav'):
             if stale.stem not in known:
                 stale.unlink()
-    report = {'voice': engine.identity['voice'], 'language': spec.get('language', 'zh'), 'sample_rate': SR,
+    engine = main_engine
+    report = {'voice': engine.identity['voice'], 'voices': sorted(engines), 'language': spec.get('language', 'zh'), 'sample_rate': SR,
               'engine': {key: value for key, value in engine.identity.items() if key != 'voice'},
               'asr': {'model': str(whisper_dir) if whisper else None, 'checked': bool(whisper), 'max_cer': .15},
               'lines': {line['id']: entries[line['id']] for line in lines if line['id'] in entries},

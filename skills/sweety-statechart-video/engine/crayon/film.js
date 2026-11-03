@@ -4,16 +4,21 @@
 (function () {
   const K = window.SCV, { C, FONT } = K;
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
-  const ASPECTS = { '3:4': [1080, 1440], '1:1': [1080, 1080], '9:16': [1080, 1920], '4:5': [1080, 1350], '16:9': [1920, 1080] };
-
-  function ratio(a) { const [w, h] = String(a).split(':').map(Number); return h / w; }
+  // any W:H; the short side of the frame is 1080 px
+  function ratio(a) {
+    const m = String(a || '3:4').replace('／', '/').match(/^\s*(\d+(?:\.\d+)?)\s*[:：x×/]\s*(\d+(?:\.\d+)?)\s*$/);
+    const r = m ? +m[2] / +m[1] : 4 / 3;
+    return Math.max(.4, Math.min(2.5, r || 4 / 3));
+  }
+  function sizeOf(a) { const r = ratio(a); return r >= 1 ? [1080, Math.round(1080 * r / 2) * 2] : [Math.round(1080 / r / 2) * 2, 1080]; }
 
   function normalise(spec) {
     const f = JSON.parse(JSON.stringify(spec));
     f.aspect = f.aspect || '3:4';
-    f.size = f.size || ASPECTS[f.aspect] || [1080, Math.round(1080 * ratio(f.aspect))];
-    f.poster = f.poster || f.aspect;
-    f.W = 1000; f.H = Math.round(1000 * ratio(f.poster));
+    f.size = f.size || sizeOf(f.aspect);
+    // the poster has the frame's shape when the frame is upright; a wide frame shows a square poster and scrolls over it
+    const fr = f.size[1] / f.size[0];
+    f.W = 1000; f.H = Math.round(1000 * (f.poster ? ratio(f.poster) : Math.max(1, fr)));
     f.speed = f.speed || (f.voice === 'none' ? 3 : 2);
     f.chapters.forEach((ch, ci) => {
       ch.index = ci; ch.num = ch.num || ROMAN[ci] || String(ci + 1);
@@ -27,7 +32,13 @@
         ch.regions.id = ch.regions.id || 'together';
         ch.regions.lanes.forEach(ln => { ln.start = ln.start || ln.states[0]; });
       }
-      ch.start = ch.start || (ch.regions && !Object.keys(ch.states).some(s => !ch.regions.lanes.some(l => l.states.includes(s))) ? ch.regions.id : Object.keys(ch.states)[0]);
+      // no start given: the regions box when no card outside it is a root (nothing points at it), else the first card
+      if (!ch.start) {
+        const inLane = s => ch.regions && ch.regions.lanes.some(l => l.states.includes(s));
+        const outer = Object.keys(ch.states).filter(s => !inLane(s));
+        const roots = outer.filter(s => !ch.edges.some(e => e.to === s && e.from !== s));
+        ch.start = ch.regions && !roots.length ? ch.regions.id : (roots[0] || Object.keys(ch.states)[0]);
+      }
       ch.entry = ci > 0 && !!f.chapters[ci - 1].exit;
       ch.steps = (ch.steps || []).map(s => typeof s === 'string' ? { note: s } : s);
     });
@@ -237,5 +248,5 @@
     if (si >= 0) drawChart(g, ch, si, t, T);
   }
 
-  K.film = { normalise, build, drawStatic, drawLive, drawChart, kit, sceneState, ASPECTS };
+  K.film = { normalise, build, drawStatic, drawLive, drawChart, kit, sceneState, ratio, sizeOf };
 })();

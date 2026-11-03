@@ -1,6 +1,17 @@
 # sweety-statechart-video
 
-把一个流程、一门生意、一个系统，做成**会动的蜡笔状态图短片**：3:4 竖版，带旁白，每章还出一张可以直接发的海报。
+跟你的 AI 助手说一句话，就能把一个流程、一门生意或一个系统，做成**会动的蜡笔状态图短片**：
+
+- 默认 3:4、2–3 分钟，比例和时长都可以指定；
+- 带旁白；
+- 每章还出一张可以直接发的海报。
+
+灵感来自 Ann Nguyen 老师（[@ann_nnng](https://x.com/ann_nnng/status/2116811409921372642)），我们做了风格提取，再加上：
+
+1. **主流 AI 助手里都能用**：Codex、Claude Code、Grok Build、Grok Bot、Muse。针对各平台做了兼容性调整，效果可能略有差异。后续计划支持 WorkBuddy 等。
+2. **四款逼真旁白**：纯合成音色，没有版权问题。也可以加自己的声音：`scv.py add-voice`。
+3. **默认 3:4**：任何比例都可以，写 `"aspect": "9:16"` 之类。
+4. **时长默认 2–3 分钟**：适配大部分自媒体。想要别的时长，写 `"duration": "1分钟"` 之类。
 
 <p>
 <img src="docs/images/takeout-1.jpg" width="24%"> <img src="docs/images/takeout-3.jpg" width="24%"> <img src="docs/images/takeout-4.jpg" width="24%"> <img src="docs/images/message-1.jpg" width="24%">
@@ -16,7 +27,7 @@
 - **一直在动：**
   - 所有线条每秒重画 5 次，像手绘动画一样抖；
   - 插画跟着状态动：火苗跳，锅颠勺，蒸汽升，车轮转，电梯跳楼层，门打开，下雨，猫甩尾巴。
-- **旁白**：四个专属声音，都是 VoxCPM2 只凭文字描述设计出来的：蜡笔姐姐、图纸哥、元气少女、老师傅。
+- **旁白**：四个专属声音，都是 VoxCPM2 只凭文字描述设计出来的：蜡笔姐姐、图纸哥、元气少女、老师傅。一部片里可以按步骤换声音。
 - **规则章**：写一条“这件事不能发生”，内置检查器会找出让它发生的最短路径，画成红线，再盖一个章。
 
 <img src="docs/images/frame-step.jpg" width="360">
@@ -42,15 +53,17 @@ python3 scripts/scv.py voices                     # 列出声音
 
 例子：
 
-- `examples/takeout/`：《一份外卖的一生》，4 章，蜡笔姐姐；
-- `examples/message/`：《一条消息的旅程》，3 章，图纸哥。
+- `examples/intro/`：《一句话，做一部会动的状态图》，5 章，2 分 10 秒，四个声音轮流出场；
+- `examples/takeout/`：《一份外卖的一生》，4 章，1.5 分钟，蜡笔姐姐；
+- `examples/message/`：《一条消息的旅程》，3 章，1 分钟，图纸哥。
 
 速度：在 M 系列 Mac 上，93 秒的片子渲染约 40 秒，36 句旁白约 3 分钟。
 
 ## 环境
 
-- **渲染**：Python 3.9+，Playwright（使用本机 Chrome），Pillow，ffmpeg。
-  - Python 解释器由 `SCV_PYTHON` 指定，默认 `~/.local/share/sweety-handdraw-video/venv/bin/python`。
+- **一键准备**：`bash skills/sweety-statechart-video/scripts/setup.sh`。它建渲染环境，没有 Chrome 时装 Playwright 的 Chromium，最后跑一遍冒烟测试。
+- **渲染**：Python 3.9+，Playwright（有 Google Chrome 就用它，没有就用 Chromium），Pillow，ffmpeg。
+  - Python 解释器由 `SCV_PYTHON` 指定，默认用 setup.sh 建的 `~/.local/share/sweety-statechart-video/venv`。
   - `python3 scripts/smoke_test.py` 约 16 秒，不需要配音环境。
 - **旁白**（Apple Silicon，全部离线）：
   - 一个装有 mlx-audio 0.5.8 和 mlx_whisper 的 Python，由 `STATECHART_MLX_PYTHON` 指定；

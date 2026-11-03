@@ -1,13 +1,13 @@
 ---
 name: sweety-statechart-video
-description: 把一个流程、一门生意、一个系统做成“蜡笔状态图短片”：照 Ann Nguyen 的 the making of nhang（一页往下长的蜡笔海报，票据卡片带图钉，箭头带事件和红色[条件]，小圆点沿箭头跑、字逐个打出、卡片弹出套粉圈，线条一直在抖，四周插画一直在动）来做，配我们自己的四个旁白声音，默认 3:4，每章一张可直接发图的海报；片子只写数据和场景脚本，可批量出片。用于“状态图视频”“状态图海报”“手绘流程图解”“把一个过程讲清楚”；不用于写实动画、口播讲解片或纯静态信息图。
+description: 把一个流程、一门生意、一个系统做成“蜡笔状态图短片”：照 Ann Nguyen 的 the making of nhang（一页往下长的蜡笔海报，票据卡片带图钉，箭头带事件和红色[条件]，小圆点沿箭头跑、字逐个打出、卡片弹出套粉圈，线条一直在抖，四周插画一直在动）来做，配四款纯合成旁白（也可加自己的声音），默认 3:4、2-3 分钟（比例和时长都可指定），每章一张可直接发图的海报；片子只写数据和场景脚本，可批量出片。用于“状态图视频”“状态图海报”“手绘流程图解”“把一个过程讲清楚”；不用于写实动画、口播讲解片或纯静态信息图。
 ---
 
 # 蜡笔状态图短片
 
 **标准是参考作品**：Ann Nguyen 的 *the making of nhang*（TypingMind 上的动态状态图；她的视频就是这一页的录屏）。我们按同样的手法自己写了画法和播放器，不含她的代码。拿不准时，回去看参考页面，以它为准；我们的老项目只当工具箱。
 
-交付：`outputs/film.mp4`（默认 1080×1440，30 fps，带旁白）、`outputs/posters/01.png…`（每章一张 2000×2666 的完整海报）、`outputs/cover.png`、`script.txt`、`editing/captions.srt`。
+交付：`outputs/film.mp4`（默认 3:4 即 1080×1440、30 fps、2–3 分钟，带旁白）、`outputs/posters/01.png…`（每章一张 2000×2666 的完整海报）、`outputs/cover.png`、`script.txt`、`editing/captions.srt`。
 
 ## 片子是什么样的
 
@@ -28,6 +28,14 @@ description: 把一个流程、一门生意、一个系统做成“蜡笔状态�
 - **旁白**：每步的字幕就是旁白，用我们自己的声音读（见 [声音](references/voices.md)）。
 - **规则章**：写一条 `never`，`scv.py check` 的检查器会找出走到违规状态的最短路径（做法学 /statechart 技能用的 TLC），用红线画出来，最后盖章。
 
+## 运行方式（所有平台通用）
+
+- 所有命令都写成绝对路径：`python3 <本 Skill 目录>/scripts/scv.py <命令> <任务目录>`。任务目录放在用户的工作目录里，不要放进 Skill 目录。
+- 第一次在一台新机器上用，先跑 `bash <本 Skill 目录>/scripts/setup.sh`：建渲染环境、装 Chromium（已有 Chrome 就直接用），最后跑一遍冒烟测试。
+- 配音只在 Apple Silicon 上跑（MLX）。环境不全时 `voice` 会报出缺什么；用户不需要旁白时，写 `"voice": "none"`。
+- `voice` 和 `render` 各要几十秒到几分钟。平台限制单条命令时长时，就分开跑，或者放到后台跑。
+- 已在 Codex、Claude Code、Grok Build 上实测，各平台的说明见 [平台](references/platforms.md)。
+
 ## 流程
 
 1. **拆题。** 读 [选题与拆图](references/story-design.md)，拆成 2–5 章，每章一种图形：平铺、同时发生的两条线、一个父状态，或者规则章。
@@ -38,6 +46,7 @@ description: 把一个流程、一门生意、一个系统做成“蜡笔状态�
 6. **`scv.py voice JOB`**：逐句配音，每句过噪声门禁和 ASR 校验，结果有缓存，改一句只重做那一句。
 7. **`scv.py plan JOB` → `stills JOB`**：打开 `work/stills/contact.jpg`，逐步检查。
 8. **`scv.py render JOB` → `posters JOB` → `finalize JOB`**，或者一条 `scv.py all JOB`。实测：93 秒的片子 40 秒渲完，旁白 36 句约 3 分钟。
+   - 例子：`examples/intro/`（2–3 分钟，默认时长）、`examples/takeout/`（指定 1.5 分钟）、`examples/message/`（指定 1 分钟）。
 9. **批量**：每个题目一个目录，写好 `film.json` 和 `scenes.js`，过一遍第 4、7 步的画面检查，然后 `scv.py batch JOB1 JOB2 …`。
 
 ## 硬规则
@@ -59,9 +68,17 @@ description: 把一个流程、一门生意、一个系统做成“蜡笔状态�
 
 ## 默认值和开关
 
-- **比例** `3:4`（1080×1440，海报也是 3:4）；可选 `1:1`、`4:5`、`9:16`、`16:9`、`2:3`。
+- **比例** `3:4`（1080×1440，海报也是 3:4）。用户要别的比例时，写 `"aspect": "W:H"`，任意比例都可以（9:16、1:1、4:5、16:9、2.35:1……，短边 1080）。
+  - 竖版的海报跟画面同形；
+  - 横版的海报是方的，镜头跟着动作在海报上滚动；
+  - 换比例后要重新跑 `layout`，插画照新的空地摆。
+- **时长**默认 **2–3 分钟**，适合小红书、抖音等大多数平台。用户要别的时长时，写 `"duration"`：`150`、`[60, 90]`、`"1分钟"` 都可以。
+  - `check` 按旁白语速预估时长，并告诉你要加几步或删几步；
+  - `plan` 在离目标差一点时，给每步多留最多 0.7 秒。
+  - 想达到 2–3 分钟：一般 4–5 章、每章 9–12 步，每句 12–20 字。
 - **节奏** `speed`：有旁白时默认 2（每步动画约 1.8 秒，再等旁白读完）；无旁白时默认 3，和参考视频一样，每步 1.2 秒。
-- **声音** `"voice"`：默认 `crayon-sister` 蜡笔姐姐，可换 `blueprint-guy` 图纸哥、`sunny-girl` 元气少女、`old-master` 老师傅，`"none"` 为无声。
+- **声音** `"voice"`：默认 `crayon-sister` 蜡笔姐姐，可换 `blueprint-guy` 图纸哥、`sunny-girl` 元气少女、`old-master` 老师傅，`"none"` 为无声。四款都是纯合成音色，没有版权问题。
+  - **用自己的声音**：`scv.py add-voice my-voice --audio 录音.m4a --start 12 --end 25 --text "逐字稿" --consent self --preview`，再写 `"voice": "my-voice"`。详见 [声音](references/voices.md)。
   - `"music": "calm"`（或 warm / curious / focused / tense）加一层轻的纯器乐，在旁白下自动压低；
   - `"sfx": true` 在卡片弹出时加轻的“啵”声。
 - **水印**默认 `制作：@leo_xiaolei/刘老板`，钉在左上角（样式同参考页的品牌小牌）；`"watermark": null` 关掉。

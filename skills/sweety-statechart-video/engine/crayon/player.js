@@ -12,7 +12,8 @@
       const [Wpx, Hpx] = film.size;
       canvas.width = Wpx; canvas.height = Hpx;
       this.k = Wpx / film.W;
-      this.bar = Math.round(Hpx * (opts.barShare || .076));
+      this.ui = Math.min(Wpx, Hpx) / 1080;              // the strip and the chip scale with the short side
+      this.bar = Math.round(Math.min(Hpx, Wpx * 4 / 3) * (opts.barShare || .076));   // 109 px at 3:4, the same on taller frames
       this.vh = (Hpx - this.bar) / this.k;               // visible page height above the caption strip, poster units
       this.full = Hpx / this.k;
       this.PH = film.H;
@@ -120,7 +121,7 @@
     chip(g) {                                           // the maker's tag, pinned top-left like the reference's brand chip
       const s = this.f.watermark === undefined ? '制作：@leo_xiaolei/刘老板' : this.f.watermark;
       if (!s) return;
-      const k = this.cv.width / 1080;
+      const k = this.ui;
       g.save();
       g.translate(12 * k, 10 * k); g.rotate(-1.5 * Math.PI / 180);
       g.font = `${Math.round(19 * k)}px ${FONT.type}`;
@@ -134,7 +135,7 @@
     }
     round(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
     captionBar(g, cur, T) {
-      const W = this.cv.width, H = this.cv.height, b = this.bar, k = W / 1080;
+      const W = this.cv.width, H = this.cv.height, b = this.bar, k = this.ui;
       g.save();
       const grad = g.createLinearGradient(0, H - b - 14 * k, 0, H - b);
       grad.addColorStop(0, 'rgba(60,40,10,0)'); grad.addColorStop(1, 'rgba(60,40,10,.10)');
