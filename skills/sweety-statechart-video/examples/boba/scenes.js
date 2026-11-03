@@ -1,8 +1,8 @@
-// A starting point, not the film: copy it to scenes.js (`scv.py draft JOB --write` does that while scenes.js is still the
-// skeleton), look at `scv.py layout JOB`, then refine: one hero scene per poster, the story's own things in the
-// smaller areas, the same cast in every chapter. See references/scenes.md.
-// modeOf(S, [[state, mode], ...], default): the set piece's mode follows whichever listed state is active; p is how far
-// that state has got (0..1), for doors that open and coins that fly.
+// scenes.js — 《一杯奶茶》: the four chart types of Kevin Ngo's "The business of boba" (statechart-art, MIT), drawn with
+// this skill's own kit in the pencil theme. I: tickets on red thread at the till; II: the shop front with notes on its
+// window (drafted by `scv.py draft`, then kept); III: the clerk and the pot side by side; IV: the pearl bug, its rules
+// legend and the red path. Chapters I and III are composed by hand; II and IV are the draft as `scv.py draft` wrote it.
+// modeOf(S, [[state, mode], ...], default): a set piece's mode follows whichever listed state is active.
 const prog = (S, id, d = 1.2) => { const k = S.since(id); return k < 0 ? 0 : k >= 99 ? 1 : Math.max(0, Math.min(1, (k - .5) / d)); };
 const modeOf = (S, map, def) => { for (const [id, m] of map) if (S.on(id)) return { mode: m, p: prog(S, id) }; return { mode: def, p: 1 }; };
 
