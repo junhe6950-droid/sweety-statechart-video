@@ -118,14 +118,15 @@
       if (ch.scene.fg) ch.scene.fg(K.film.kit(g, this.f, ch), K.film.sceneState(ch, sceneStep, si >= ch.S.list.length ? 99 : t, T));
       if (si >= 0) { K.setBoil(boil); K.film.drawChart(g, ch, si, t, T); }
     }
-    chip(g) {                                           // the maker's tag, pinned top-left like the reference's brand chip
+    chip(g) {                                           // the maker's tag, styled like the reference's brand chip
       const s = this.f.watermark === undefined ? '制作：@leo_xiaolei/刘老板' : this.f.watermark;
       if (!s) return;
       const k = this.ui;
       g.save();
-      g.translate(12 * k, 10 * k); g.rotate(-1.5 * Math.PI / 180);
       g.font = `${Math.round(19 * k)}px ${FONT.type}`;
       const w = g.measureText(s).width + 22 * k, h = 34 * k;
+      // top-right: the header (and its big title) lives top-left and must never sit under the tag
+      g.translate(this.cv.width - w - 14 * k, 12 * k); g.rotate(1.5 * Math.PI / 180);
       g.globalAlpha = .9;
       g.fillStyle = 'rgba(33,64,214,.35)'; this.round(g, 3 * k, 3 * k, w, h, 6 * k); g.fill();
       g.fillStyle = '#fbf7ec'; this.round(g, 0, 0, w, h, 6 * k); g.fill();

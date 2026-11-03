@@ -72,6 +72,7 @@ DIGITS = re.compile(r'\d')
 LEAD, GAP, CHAPTER_GAP, VOICE_AT = 1.0, .35, .25, .12
 DURATION_DEFAULT = (120.0, 180.0)              # 2-3 minutes: what most short-video feeds reward
 MAX_STRETCH = .7                                # at most this much extra hold per step to reach the target
+READ_BASE, READ_CPS = .5, 7.                     # a silent step lasts at least this long: time to read its caption
 SPOKEN = re.compile(r'[，。！？；：、“”‘’（）《》〈〉【】—…·,.!?;:"\'()\[\]\s↓→]')
 
 
@@ -112,6 +113,8 @@ def estimate_seconds(spec):
     anim, allsteps, t = 3.6 / sp, steps_of(spec), LEAD
     for n, (ci, si, st) in enumerate(allsteps):
         d = anim
+        if not rate and spec.get('read_pace', True):
+            d = max(anim, READ_BASE + len(SPOKEN.sub('', st.get('note') or '')) / READ_CPS)
         if rate:
             chars = len(SPOKEN.sub('', st.get('say') or st.get('note') or ''))
             if chars:
@@ -459,6 +462,8 @@ def plan(job, spec):
         if lid in durs:
             d = max(anim, VOICE_AT + durs[lid] + GAP)
             lines.append({'id': lid, 'at': round(t + VOICE_AT, 3)})
+        elif not v and spec.get('read_pace', True):        # silent: long enough to read the caption
+            d = max(anim, READ_BASE + len(SPOKEN.sub('', st.get('note') or '')) / READ_CPS)
         last_of_chapter = n + 1 == len(allsteps) or allsteps[n + 1][0] != ci
         if last_of_chapter:
             d += CHAPTER_GAP

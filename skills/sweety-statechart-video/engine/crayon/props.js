@@ -159,6 +159,40 @@
     if (o.straw) K.line(ctx, [[x + 4 * s, y - 50 * s], [x + 12 * s, y - 78 * s]], { w: 4, color: C.pink });
     if (o.t != null && o.steam !== false && !o.straw) for (let k = 0; k < 2; k++) P.steam(ctx, x - 8 * s + k * 16 * s, y - 56 * s, o.t, k * 2.1 + x, 48 * s, 4 * s);
   };
+  P.kettle = (ctx, x, y, s = 1, o = {}) => {             // a stovetop kettle; y = base; o.t + o.boiling: steam and a rattling lid
+    K.seed('kettle' + x + y);
+    const t = o.t || 0, c = col(o.color) || C.red, rattle = o.boiling ? Math.abs(Math.sin(t * 18)) * 4 * s : 0;
+    const body = K.smooth([[x - 58 * s, y], [x - 62 * s, y - 40 * s], [x - 40 * s, y - 74 * s], [x + 40 * s, y - 74 * s], [x + 62 * s, y - 40 * s], [x + 58 * s, y]], 2, true);
+    K.shape(ctx, body, { fill: c, h: { gap: 2.6, base: .8, solid: C.white, layers: [{ color: c }, { color: C.redD, angle: .5, gap: 6, alpha: .45 }] }, w: 2.6 });
+    K.shape(ctx, K.capsule(K.qbez([x + 52 * s, y - 34 * s], [x + 86 * s, y - 40 * s], [x + 100 * s, y - 72 * s], 8), 14 * s, 8 * s), { fill: c, h: { gap: 2.4, base: .85 }, w: 2.2 });
+    K.line(ctx, K.qbez([x - 36 * s, y - 74 * s], [x, y - 128 * s], [x + 36 * s, y - 74 * s], 10), { w: 4 * s, color: C.navy });
+    K.shape(ctx, K.ell(x, y - 78 * s - rattle, 30 * s, 8 * s, 18), { fill: c, h: { gap: 2.2, base: .9 }, w: 2 });
+    K.dot(ctx, x, y - 88 * s - rattle, 6 * s, C.navy);
+    K.blob(ctx, x - 26 * s, y - 46 * s, 9 * s, C.white, .6);
+    if (o.t != null && o.steam !== false) for (let k = 0; k < (o.boiling ? 3 : 1); k++) P.steam(ctx, x + 100 * s + k * 8, y - 80 * s, t, k + x, (o.boiling ? 90 : 40) * s, 5 * s);
+  };
+  P.teapot = (ctx, x, y, s = 1, o = {}) => {             // a round teapot; y = base
+    K.seed('teapot' + x + y);
+    const c = col(o.color) || C.teal;
+    K.shape(ctx, K.ell(x, y - 40 * s, 52 * s, 40 * s, 26), { fill: c, h: { gap: 2.6, base: .8, solid: C.white, layers: [{ color: c }, { color: C.greenD, angle: .5, gap: 6, alpha: .4 }] }, w: 2.6 });
+    K.shape(ctx, K.capsule(K.qbez([x + 46 * s, y - 34 * s], [x + 76 * s, y - 40 * s], [x + 88 * s, y - 64 * s], 8), 13 * s, 7 * s), { fill: c, h: { gap: 2.4, base: .85 }, w: 2 });
+    K.line(ctx, K.qbez([x - 48 * s, y - 56 * s], [x - 82 * s, y - 44 * s], [x - 50 * s, y - 20 * s], 8), { w: 4 * s, color: c });
+    K.shape(ctx, K.ell(x, y - 80 * s, 26 * s, 7 * s, 16), { fill: c, h: { gap: 2.2, base: .9 }, w: 2 });
+    K.dot(ctx, x, y - 90 * s, 6 * s, C.straw);
+    for (let i = 0; i < 3; i++) P.flower(ctx, x - 22 * s + i * 22 * s, y - 36 * s, 5 * s, .3, C.white);
+    if (o.t != null && o.steam !== false) P.steam(ctx, x + 88 * s, y - 70 * s, o.t, x, 50 * s, 4 * s);
+  };
+  P.teacup = (ctx, x, y, s = 1, o = {}) => {             // a glass cup of tea; o.steep 0..1 darkens the tea, o.leaves floating
+    K.seed('teacup' + x + y);
+    const k = K.clamp(o.steep ?? 1), w = 34 * s, h = 70 * s;
+    const glass = [[x - w, y - h], [x + w, y - h], [x + w * .82, y], [x - w * .82, y]];
+    const tea = [[x - w * .96, y - h * .78], [x + w * .96, y - h * .78], [x + w * .82, y - 2], [x - w * .82, y - 2]];
+    K.hatch(ctx, tea, { color: k > .5 ? C.ochre : C.yolk, base: .3 + .55 * k, gap: 3, layers: [{ color: k > .6 ? C.brown : C.straw, alpha: .2 + .5 * k }] });
+    if (o.leaves !== false) for (let i = 0; i < 4; i++) { const sw = Math.sin((o.t || 0) * 1.5 + i * 1.7) * 4 * s; K.shape(ctx, K.ell(x - w * .5 + i * w * .34 + sw, y - h * (.3 + .12 * (i % 2)), 7 * s, 3.5 * s, 10, 0, Math.PI * 2, i), { fill: C.greenD, h: { base: .9, gap: 2 }, w: 1.4 }); }
+    K.line(ctx, glass, { closed: true, w: 2.4 });
+    K.line(ctx, [[x - w * .7, y - h * .9], [x - w * .62, y - h * .3]], { w: 2, color: C.white, passes: 1 });
+    if (o.t != null && o.steam !== false) for (let i = 0; i < 2; i++) P.steam(ctx, x - 8 * s + i * 16 * s, y - h - 6 * s, o.t, i + x, 50 * s, 4 * s);
+  };
   P.plate = (ctx, x, y, s = 1, food) => { K.seed('plate' + x); K.shape(ctx, K.ell(x, y, 50 * s, 14 * s, 26), fillH('white', { base: .4, layers: [{ color: C.sky, alpha: .6 }] })); if (food) K.shape(ctx, K.smooth([[x - 30 * s, y - 4 * s], [x - 10 * s, y - 22 * s], [x + 22 * s, y - 20 * s], [x + 30 * s, y - 4 * s]], 1), { fill: col(food), h: { gap: 2.4, base: .85 }, w: 2 }); };
   P.jar = (ctx, x, y, s = 1, o = {}) => {               // y = shelf; o.label, o.fill colour of contents, o.empty
     K.seed('jar' + x + y);

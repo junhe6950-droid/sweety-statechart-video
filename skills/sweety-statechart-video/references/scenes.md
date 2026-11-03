@@ -102,6 +102,7 @@ $.person($.pose.sit(x, 座面y, .8, 1, { t: S.T, arms: 'type', floor: 地面y })
   - `stove(x, y, w, t, on)` 灶，会出火；`wok(x, 锅沿y, s, t, {toss})` 会颠；`pot(cx, 口y, 半径, 高, {liquid, lid, handles, bubbles, t})`
   - `bowl(x, y, s, {food: noodles|rice|soup, soggy, t})` 有蒸汽；`cup(x, y, s, {t, straw})`；`plate`；`chopsticks`
   - `jar(x, y, s, {label, fill, empty})` 带标签的罐子，例如“售罄”
+  - `kettle(x, y, s, {t, boiling})` 烧水壶，开了时冒大汽、壶盖跳；`teapot(x, y, s, {t})` 茶壶；`teacup(x, y, s, {t, steep: 0..1})` 玻璃茶杯，茶色随 steep 变深、茶叶漂
 - **家具和房子**
   - `table(x, 桌面y, w, h)`；`chair`；`stool(x, 座面y, w, h, 颜色)`；`bench`
   - `counter(x0, x1, 台面y, h, {sign})` 柜台；`shelf(x, 底y, w, 层数)` 货架

@@ -76,12 +76,12 @@ description: 把一个流程、一门生意、一个系统做成“蜡笔状态�
   - `check` 按旁白语速预估时长，并告诉你要加几步或删几步；
   - `plan` 在离目标差一点时，给每步多留最多 0.7 秒。
   - 想达到 2–3 分钟：一般 4–5 章、每章 9–12 步，每句 12–20 字。
-- **节奏** `speed`：有旁白时默认 2（每步动画约 1.8 秒，再等旁白读完）；无旁白时默认 3，和参考视频一样，每步 1.2 秒。
+- **节奏** `speed`：有旁白时默认 2（每步动画约 1.8 秒，再等旁白读完）；无旁白时默认 3，和参考视频一样，动画 1.2 秒，每步至少停到字幕读得完（`"read_pace": false` 恢复参考的 1.2 秒）。
 - **声音** `"voice"`：默认 `crayon-sister` 蜡笔姐姐，可换 `blueprint-guy` 图纸哥、`sunny-girl` 元气少女、`old-master` 老师傅，`"none"` 为无声。四款都是纯合成音色，没有版权问题。
   - **用自己的声音**：`scv.py add-voice my-voice --audio 录音.m4a --start 12 --end 25 --text "逐字稿" --consent self --preview`，再写 `"voice": "my-voice"`。详见 [声音](references/voices.md)。
   - `"music": "calm"`（或 warm / curious / focused / tense）加一层轻的纯器乐，在旁白下自动压低；
   - `"sfx": true` 在卡片弹出时加轻的“啵”声。
-- **水印**默认 `制作：@leo_xiaolei/刘老板`，钉在左上角（样式同参考页的品牌小牌）；`"watermark": null` 关掉。
+- **水印**默认 `制作：@leo_xiaolei/刘老板`，钉在右上角（样式同参考页的品牌小牌，不压左上角的标题）；`"watermark": null` 关掉。
 - **字体**（随包，均可再分发）：
   - Special Elite（打字机，Apache-2.0）配宋体，用在标题和卡片；
   - Courier Prime（OFL）配霞鹜文楷（OFL），用在箭头字和字幕。
