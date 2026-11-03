@@ -14,7 +14,7 @@ description: 格物 · 蜡笔状态图——把一个流程、一门生意、一
 两边的画法和播放器都是我们自己写的。拿不准时，回去看参考作品，以它为准。
 
 交付：
-- `outputs/film.mp4`：默认 3:4 即 1080×1440、30 fps、2–3 分钟，带旁白；
+- `outputs/film.mp4`：默认 3:4 即 1080×1440、30 fps、2–3 分钟，带旁白，用来转发；另有 `outputs/film-master.mp4`，约 11 Mbps 的上传母版，给平台再转码留余量；
 - `outputs/posters/01.png…`：每章一张完整海报，另有 `01-layout.png`，用蓝框画出排版；
 - `outputs/cover.png`、`script.txt`、`editing/captions.srt`；
 - 按需另出分章短片、长图、可交互网页、作品集页和发布包（见 [交付](references/delivery.md)）。
@@ -139,6 +139,14 @@ description: 格物 · 蜡笔状态图——把一个流程、一门生意、一
 - 旁白用本机 VoxCPM2 MLX 和 Whisper（`STATECHART_MLX_PYTHON`），全部离线；`scripts/audio_doctor.py` 可以检查环境。
 - 排版自动完成。个别卡片可以用 `"at": [列, 行]` 钉位置。只支持一层父状态，更深的嵌套导入时会拆成几章。
 - `scv.py export JOB --to mermaid|xstate|scxml` 把片子里的图导回文档和代码。
+- 更多交付：
+  - `scv.py deliver JOB --what clips,longimage,social,gif,html,site`：分章短片、长图、各平台尺寸的配图、动图、可交互网页（逐步模式、聚光、显微镜）、作品集页；
+  - film.json 写 `"deliver": [...]` 时，`all` 顺带做；
+  - `scv.py publish JOB` 出发布包。
+
+  详见 [交付](references/delivery.md)。
+- **渲染出问题**时加 `--encoder legacy`，赶时间加 `--encoder webcodecs`（硬件编码）。
+- **改了引擎画面以后**，跑 `scv.py golden` 对照基准帧，`python3 scripts/test_engine.py` 检查各种比例、主题和画法。
 - 检查器是本项目自己的显式状态检查（学 TLC 的做法），不运行 TLA+；/statechart 技能用 TLC 查过的结果可以直接导入。
 - 合成旁白是 AI 生成内容，发布时要按平台要求标注。
 - 致谢和许可见仓库的 `THIRD_PARTY_NOTICES.md`。

@@ -254,7 +254,7 @@
     }
     // the spotlight: everything but the active cards dims, as when you step through the chart by hand
     spotlight(g, A, t, view, m) {
-      const ch = this.f.chapters[A.ci], L = ch.L, ids = A.s.on.length ? A.s.on : A.s.pass;
+      const ch = this.f.chapters[A.ci], L = ch.L, ids = Array.isArray(this.opts.spotlight) ? this.opts.spotlight : A.s.on.length ? A.s.on : A.s.pass;
       if (!ids.length) return;
       const W = this.cv.width, H = this.cv.height - this.bar, a = K.clamp((t - .9) / .5) * .42;
       if (a <= 0) return;
@@ -427,5 +427,6 @@
       if (cur >= 0 && !outro && !hookText && this.opts.lanes !== false) this.laneStatus(g, cur);
     }
   }
+  Player.features = { spotlight: true, inset: true, push: true, hook: true, outro: true };   // what the player shell may hand over
   K.Player = Player;
 })();
