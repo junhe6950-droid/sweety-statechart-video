@@ -63,6 +63,7 @@ LEAD_SECONDS = .06             # kept before the first speech frame
 RAW_TAIL_SECONDS = .6          # kept after the last speech frame until the tail rule decides
 TAIL_QUIET_DB = -40.           # the last syllable has ended once the level stays this far under the clip peak...
 TAIL_QUIET_SECONDS = .03       # ...for this long
+TAIL_QUIET_WORDS_SECONDS = .12 # spaced languages: longer, a stop closure inside the last word (typ-ing) is not its end
 TAIL_BURST_DB = -30.           # a sound this loud after that quiet is an after-sound, dropped
 TAIL_LOUD_DB = -25.            # a clip still ending this loud with no quiet after its last word was cut off
 TAIL_KEEP_SECONDS = .12        # natural decay kept after the last syllable
@@ -220,7 +221,7 @@ def tail_levels(samples, rate=SR):
     return 20 * np.log10(np.maximum(rms, 1e-9) / peak)
 
 
-def speech_tail(samples, words=None, rate=SR):
+def speech_tail(samples, words=None, rate=SR, quiet_seconds=TAIL_QUIET_SECONDS):
     """(cut seconds or None, report): the last syllable ends at the first quiet run after the last word's first
     MIN_SYLLABLE_SECONDS; an after-sound burst is dropped; None when the clip ends loud (the last word was cut off)."""
     levels = tail_levels(samples, rate)
@@ -230,7 +231,7 @@ def speech_tail(samples, words=None, rate=SR):
         anchor = max(float(last['start']) + MIN_SYLLABLE_SECONDS, float(last.get('end', last['start'])) - .1)
     else:
         anchor = max(0., speech_span(samples, rate)[1] - .4)
-    quiet = max(1, round(TAIL_QUIET_SECONDS / .01))
+    quiet = max(1, round(quiet_seconds / .01))
     first = min(count - 1, max(0, int(anchor / .01)))
     end_frame = None
     for frame in range(first, count - quiet + 1):
@@ -419,7 +420,7 @@ def check_take(audio, reading, whisper, exceptions, language='zh'):
         if coverage['status'] != 'pass':
             failures.append(f"ASR does not cover the reading, ending included (CER {coverage['cer']}): {heard['text']!r}")
         words = heard['words']
-    cut, tail = speech_tail(audio, words)
+    cut, tail = speech_tail(audio, words, quiet_seconds=TAIL_QUIET_WORDS_SECONDS if i18n.uses_words(language) else TAIL_QUIET_SECONDS)
     result['tail'] = tail
     kept = None
     if cut is None:

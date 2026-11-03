@@ -28,7 +28,7 @@ FADE_OUT_SECONDS = 3.
 
 def sync_key(sync):
     """What makes a synced bed different: tempo, grid origin, sections and accents (None for an unsynced bed)."""
-    if not sync:
+    if not isinstance(sync, dict):
         return None
     keep = {key: sync.get(key) for key in ('bpm', 'origin', 'sections', 'accents', 'stretch')}
     return hashlib.sha256(json.dumps(keep, sort_keys=True).encode()).hexdigest()[:16]

@@ -417,7 +417,9 @@ def ensure_music(job, music, duration, warnings):
     folder = job / 'work' / 'audio'
     record_path, path = folder / 'music.json', folder / 'music.wav'
     from music import render_bed, sync_key
-    mood, seed, sync = music.get('mood'), int(music.get('seed', 0)), music.get('sync')
+    mood, seed, sync = music.get('mood'), int(music.get('seed', 0)), music.get('sync') or None
+    if sync is not None and not isinstance(sync, dict):
+        raise SystemExit('timeline.json music.sync is not a beat grid: run `scv.py plan JOB` again')
     record = json.loads(record_path.read_text()) if record_path.is_file() else {}
     fresh = path.is_file() and record.get('mood') == mood and record.get('seed') == seed and abs(float(record.get('duration', -1)) - duration) <= .05 \
         and record.get('sync_key') == sync_key(sync)
