@@ -18,7 +18,9 @@
     f.size = f.size || sizeOf(f.aspect);
     // the poster has the frame's shape when the frame is upright; a wide frame shows a square poster and scrolls over it
     const fr = f.size[1] / f.size[0];
-    f.W = 1000; f.H = Math.round(1000 * (f.poster ? ratio(f.poster) : Math.max(1, fr)));
+    // a wide frame whose chapters have no regions flows left to right on a poster of the frame's own shape
+    if (!f.flow) f.flow = fr < .9 && !f.chapters.some(c => c.regions) ? 'right' : 'down';
+    f.W = 1000; f.H = Math.round(1000 * (f.poster ? ratio(f.poster) : f.flow === 'right' ? fr : Math.max(1, fr)));
     f.speed = f.speed || (f.voice === 'none' ? 3 : 2);
     // phones show a 1080-wide frame at about 0.37x: an upright frame gets larger card and arrow words
     const upright = fr > 1.1, big = f.text || {};
@@ -26,7 +28,7 @@
     if (K.layout && K.layout.setText) K.layout.setText(f.text);
     f.player = f.player || {};
     f.chapters.forEach((ch, ci) => {
-      ch.index = ci; ch.num = ch.num || ROMAN[ci] || String(ci + 1);
+      ch.index = ci; ch.num = ch.num || ROMAN[ci] || String(ci + 1); ch.flow = ch.flow || f.flow;
       ch.states = ch.states || {};
       const acc = K.theme ? K.theme.accent(ci) : { pins: ['pink'], tint: 'sky' };
       Object.values(ch.states).forEach((st, k) => { if (!st.pin) st.pin = st.kind === 'error' ? 'red' : st.kind === 'final' ? 'green' : acc.pins[k % acc.pins.length]; });
@@ -190,12 +192,20 @@
     if (K.theme) K.theme.apply(spec);
     const f = normalise(spec);
     const g = document.createElement('canvas').getContext('2d');
-    const layouts = f.chapters.map(ch => {
+    const lay = () => f.chapters.map(ch => {
       const head = header(ch, f, g);
       const L = K.layout.chapter(ch, f.W, f.H, head);
       L.header = head;
       return L;
     });
+    let layouts = lay();
+    if (f.flow === 'right') {                           // a left-to-right chain may need a wider poster: widen and lay out again
+      const fr = f.size[1] / f.size[0];
+      const needOf = ls => Math.max(...ls.map(L => Math.max(0, ...Object.values(L.boxes).map(b => b.x + b.w / 2), ...L.edges.flatMap(e => e.pts.map(q => q[0])), ...L.edges.filter(e => e.lab && e.lab.box).map(e => e.lab.box.x1)))) + 40;
+      for (let k = 0, need = needOf(layouts); k < 4 && need > f.W && f.W < 2400; k++, need = needOf(layouts)) {
+        f.W = Math.min(2400, Math.ceil(Math.max(need, f.W * 1.15) / 50) * 50); f.H = Math.round(f.W * fr); layouts = lay();
+      }
+    }
     f.chapters.forEach((ch, ci) => { if (ch.exit) K.layout.linkChapters(layouts[ci], layouts[ci + 1], f.H, ch.exit); });
     f.chapters.forEach((ch, ci) => {
       const L = layouts[ci];

@@ -361,10 +361,26 @@
 
   /* ---------------- a chapter ---------------- */
   // chapter: normalised by film.js: {states:{id:{label,tag,pin,at}}, edges:[{id,from,to,text,...}], start, regions?, entry?}
+  // a chapter flowing left to right: lay it out top-down in a transposed space (every card's width and height
+  // swapped), turn the result back, and place the arrow words again in the real space
   function chapter(ch, W, H, header) {
-    const items = {};
+    if (ch.flow !== 'right' || ch.regions) return chapterDown(ch, W, H, header);
+    const T = r => ({ x0: r.y0, y0: r.x0, x1: r.y1, y1: r.x1 }), tp = p => [p[1], p[0]];
+    const res = chapterDown(ch, H, W, T(header), { swap: true });
+    const boxes = {}, dots = {};
+    for (const [id, b] of Object.entries(res.boxes)) boxes[id] = { ...b, x: b.y, y: b.x, w: boxWidth(ch.states[id] || {}), h: TH };
+    for (const [id, d] of Object.entries(res.dots)) dots[id] = { ...d, x: d.y, y: d.x };
+    const edges = res.edges.map(e => { const pts = e.pts.map(tp); return { ...e, pts, route: K.rounded(pts, 16), lab: null }; });
+    const env = { nodes: Object.values(boxes).map(b => ({ ...b, kind: 'box' })).concat(Object.values(dots).map(d => ({ ...d, kind: d.type, w: 30, h: 30 }))),
+      blocks: [header], routes: [], labels: [], bounds: { x0: 16, x1: W - 16, y0: 8, y1: H - 6 }, allRoutes: edges.map(e => e.pts) };
+    let penalty = 0;
+    for (const e of edges) { placeWords(e, env); if (e.lab && e.lab.penalty >= 2500) penalty += e.lab.penalty; }
+    return { ...res, penalty, boxes, dots, edges, containers: [], offset: tp(res.offset), entryX: boxes[res.start] ? boxes[res.start].x : res.entryX, flow: 'right' };
+  }
+  function chapterDown(ch, W, H, header, mode = {}) {
+    const items = {}, sx = v => v * W / 1000;
     const GAPV = Math.round(GAP + Math.max(0, H - 1000) * .06);
-    const box = (id, st) => ({ id, kind: 'box', label: st.label || id, tag: st.tag, pin: st.pin, w: boxWidth(st), h: TH, at: st.at, size: st.size, skind: st.kind, mood: st.mood, look: st.look });
+    const box = (id, st) => ({ id, kind: 'box', label: st.label || id, tag: st.tag, pin: st.pin, w: mode.swap ? TH + 30 : boxWidth(st), h: mode.swap ? boxWidth(st) : TH, at: st.at, size: st.size, skind: st.kind, mood: st.mood, look: st.look });
     for (const [id, st] of Object.entries(ch.states)) items[id] = box(id, st);
     for (const e of ch.edges) if (e.to === 'end' || /^end\d*$/.test(e.to)) items[e.to] = items[e.to] || { id: e.to, kind: 'end', w: 30, h: 30 };
     const container = ch.regions ? ch.regions.id : null;
@@ -445,14 +461,14 @@
     const bb0 = localBB();
     const bottomRoom = H - (ch.exit ? 150 : 110);
     const tries = [];
-    const centres = [590, 560, 620, 530, 650, 500, 680, 470, 440, 710];
+    const centres = [590, 560, 620, 530, 650, 500, 680, 470, 440, 710].map(sx);
     for (let dy = 0; dy <= 420; dy += 20) for (const cx of centres) tries.push([cx, dy]);
     let chosen = null, firstFit = null, attempts = 0;
     const topY = (hasStartDot || ch.entry ? 100 : 70) - bb0.y0;
     for (const [cx, dy] of tries) {
       const ox = cx - (s0 ? s0.x : (bb0.x0 + bb0.x1) / 2), oy = topY + dy;
       const x0 = bb0.x0 + ox, x1 = bb0.x1 + ox, y0 = bb0.y0 + oy, y1 = bb0.y1 + oy;
-      if (x0 < 24 || x1 > 976 || y1 > bottomRoom) continue;
+      if (x0 < 24 || x1 > W - 24 || y1 > bottomRoom) continue;
       const clear = topItems.every(n => !hit(grow(R(n.x + ox - n.w / 2, n.y + oy - n.h / 2 - 12, n.x + ox + n.w / 2, n.y + oy + n.h / 2), 14), header));
       if (!clear) continue;
       if (!firstFit) firstFit = [ox, oy];
@@ -461,7 +477,7 @@
       if (!chosen || res.penalty < chosen.penalty) chosen = res;
       if (++attempts > 40) break;
     }
-    if (!chosen) chosen = attempt(...(firstFit || [500 - (bb0.x0 + bb0.x1) / 2, topY + 200]));
+    if (!chosen) chosen = attempt(...(firstFit || [W / 2 - (bb0.x0 + bb0.x1) / 2, topY + 200]));
     return chosen;
 
     function attempt(ox, oy) {
@@ -478,7 +494,7 @@
       }
       if (startDot) { const s = N[start]; N.start = { ...startDot, x: s.x, y: s.y - s.h / 2 - 40 }; }
       const nodes = Object.values(N).filter(n => n.kind !== 'start' || n.id === 'start');
-      const env = { nodes: nodes.filter(n => !n.parent), blocks: [header], routes: [], labels: [], bounds: { x0: 16, x1: 984, y0: 8, y1: H - 6 } };
+      const env = { nodes: nodes.filter(n => !n.parent), blocks: [header], routes: [], labels: [], bounds: { x0: 16, x1: W - 16, y0: 8, y1: H - 6 } };
       const edges = ch.edges.filter(e => !(laneOf[e.from] && laneOf[e.to])).map(e => ({ ...e }));
       const inner = [];
       if (K0) {
@@ -501,12 +517,12 @@
         extra.push({ id: 'start>' + start, from: 'start', to: start, kind: 'start', text: '', pts: [port(N.start, 'bottom', 0, 'out'), port(s, 'top', 0, 'in')] });
       }
       env.allRoutes = edges.map(e => e.pts).concat(inner.map(e => e.pts), extra.map(e => e.pts));
-      for (const e of edges) placeWords(e, env);
+      if (!mode.swap) for (const e of edges) placeWords(e, env);        // a transposed layout places its words afterwards
       let penalty = 0;
       edges.forEach(e => { penalty += Math.max(0, (e.penalty || 0) - 2500); if (e.lab) penalty += e.lab.penalty >= 2500 ? e.lab.penalty : 0; });
       const boxes = {}, dots = {};
       for (const n of Object.values(N)) {
-        if (n.kind === 'box') boxes[n.id] = { id: n.id, x: n.x, y: n.y, w: n.w, h: TH, label: n.label, tag: n.tag, pin: n.pin, size: n.size, lane: n.lane, kind: n.skind, mood: n.mood, look: n.look };
+        if (n.kind === 'box') boxes[n.id] = { id: n.id, x: n.x, y: n.y, w: n.w, h: mode.swap ? n.h : TH, label: n.label, tag: n.tag, pin: n.pin, size: n.size, lane: n.lane, kind: n.skind, mood: n.mood, look: n.look };
         else if (n.kind === 'end' || n.kind === 'start') dots[n.id] = { id: n.id, type: n.kind, x: n.x, y: n.y };
       }
       const outEdges = edges.concat(inner, extra).map(e => ({ id: e.id, from: e.from, to: e.to, kind: e.kind, text: e.text || '', pts: e.pts, route: K.rounded(e.pts, 16), lab: e.lab || null, noHead: !!e.noHead, style: e.style, waitsLane: e.waitsLane }));
