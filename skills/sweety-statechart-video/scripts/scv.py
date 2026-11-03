@@ -14,7 +14,11 @@ usage: scv.py <command> JOB [options]
   render    JOB [--workers N] [--start S --end E]   frames -> work/render/video.mp4
   posters   JOB               finished posters -> outputs/posters/, outputs/cover.png
   finalize  JOB               sound (voice / music / sfx) + mux -> outputs/film.mp4, captions.srt, script.txt
-  all       JOB               check, lines, voice, plan, render, posters, finalize
+  all       JOB               check, lines, voice, plan, render, posters, finalize (+ deliver, publish)
+  deliver   JOB [--what clips,longimage,html,gif,site,social]   more outputs from the same render (scripts/deliver.py)
+  publish   JOB               outputs/publish/: titles, description, tags, chapter times, platform notes (publish.py)
+  preview   JOB [--port N] [--open]   the film in a player on 127.0.0.1, with sound; reloads on edits (preview.py)
+  golden    [--update]        the three examples at fixed times against tests/golden/ (scripts/golden.py)
   batch     JOB [JOB...]      `all` for each job, then a summary
   voices                      list the voices
   add-voice ID --audio F --text T --consent self|authorized [--start S --end E] [--preview]
@@ -328,6 +332,7 @@ def write_page(job, spec, mode='play', timing=None, opts=None):
 {tags}
 {f'<script src="{scenes}"></script>' if scenes else ''}
 <script src="{(CRAYON / 'main.js').as_uri()}"></script>
+<script src="{(CRAYON / 'record.js').as_uri()}"></script>
 </body></html>"""
     page = work / f'page-{mode}.html'
     page.write_text(html)
@@ -560,28 +565,36 @@ def posters(job, spec):
 
 
 # ------------------------------------------------------------------ render
-def render_chunk(job, spec, f0, f1, dest):
-    """one browser renders frames [f0, f1) into one H.264 file; any failure exits non-zero (the parent retries)"""
+def render_chunk(job, spec, f0, f1, dest, encoder='legacy'):
+    """one browser renders frames [f0, f1) into one H.264 file (x264 also writes the master's chunk, see frames.py);
+    any failure exits non-zero (the parent retries)"""
     from playwright.sync_api import sync_playwright
+    import frames
     timing = json.loads((job / 'work/timing.json').read_text())
     W, H, fps = timing['W'], timing['H'], timing['fps']
-    cmd = ['ffmpeg', '-v', 'error', '-y', '-f', 'image2pipe', '-framerate', str(fps), '-c:v', 'mjpeg', '-i', '-',
-           '-c:v', 'libx264', '-preset', 'slow', '-crf', '26', '-pix_fmt', 'yuv420p', '-g', str(fps * 2), str(dest)]
-    ff = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+    if encoder == 'legacy':
+        cmd = ['ffmpeg', '-v', 'error', '-y', '-f', 'image2pipe', '-framerate', str(fps), '-c:v', 'mjpeg', '-i', '-',
+               '-c:v', 'libx264', '-preset', 'slow', '-crf', '26', '-pix_fmt', 'yuv420p', '-g', str(fps * 2), str(dest)]
+        ff = subprocess.Popen(cmd, stdin=subprocess.PIPE)
     beat = Path(str(dest) + '.beat')
     beat.write_text('launch')
     with sync_playwright() as p:
         b, pg, errors = open_page(p, job / 'work/page-play.html', W, H)
         beat.write_text(f'ready {f0}')
         pg.set_default_timeout(30000)
-        for f in range(f0, f1):
-            ff.stdin.write(b64(pg.evaluate(f'frameJPEG({f / fps:.6f}, .94)')))
-            if f % 15 == 0:
-                beat.write_text(f'frame {f}')
+        if encoder == 'legacy':
+            for f in range(f0, f1):
+                ff.stdin.write(b64(pg.evaluate(f'frameJPEG({f / fps:.6f}, .94)')))
+                if f % 15 == 0:
+                    beat.write_text(f'frame {f}')
+            ff.stdin.close()
+            rc = ff.wait()
+        elif encoder == 'webcodecs':
+            rc = frames.record_webcodecs(pg, W, H, fps, f0, f1, dest, beat)
+        else:
+            rc = frames.record_x264(pg, W, H, fps, f0, f1, dest, beat)
         if errors:
             print('page errors:', *errors[:3], sep='\n  ', file=sys.stderr)
-        ff.stdin.close()
-        rc = ff.wait()
         beat.write_text('done' if rc == 0 else 'ffmpeg-failed')
         import threading  # closing Chrome can hang: try politely, never wait long
         th = threading.Thread(target=lambda: b.close(), daemon=True)
@@ -592,12 +605,23 @@ def render_chunk(job, spec, f0, f1, dest):
         os._exit(0 if rc == 0 else 3)
 
 
-def render(job, spec, workers=6, start=0.0, end=None, chunk_seconds=8.0):
+def render(job, spec, workers=6, start=0.0, end=None, chunk_seconds=8.0, encoder=None):
     """short chunks, each in its own process group with a heartbeat; a stuck or crashed browser is killed and its
-    chunk rendered again"""
+    chunk rendered again. encoder: x264 (default: film + master), webcodecs, legacy (see frames.py)"""
     import signal
+    import frames
+    encoder = frames.encoder_of(spec, encoder)
     timing = json.loads((job / 'work/timing.json').read_text())
     write_page(job, spec, 'play', page_timing(timing))
+    if encoder == 'webcodecs':
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            b, pg, _ = open_page(p, job / 'work/page-play.html', timing['W'], timing['H'])
+            ok = frames.probe_webcodecs(pg)
+            b.close()
+        if not ok.get('supported'):
+            print(f'webcodecs: this Chrome has no {frames.WEBCODECS["codec"]} encoder; using x264', flush=True)
+            encoder = 'x264'
     fps = timing['fps']
     dur = end or timing['duration']
     F0, F1 = round(start * fps), round(dur * fps)
@@ -613,7 +637,7 @@ def render(job, spec, workers=6, start=0.0, end=None, chunk_seconds=8.0):
         while todo and len(running) < workers:
             i, a, b, dest, tries = todo.pop(0)
             log = open(seg / f'chunk{i:04d}.log', 'w')
-            pr = subprocess.Popen([sys.executable, __file__, '_chunk', str(job), str(a), str(b), str(dest)], stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+            pr = subprocess.Popen([sys.executable, __file__, '_chunk', str(job), str(a), str(b), str(dest), encoder], stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
             running.append([pr, (i, a, b, dest, tries), time.time() + 120 + (b - a) * 1.2, log, time.time(), -1])
         time.sleep(0.5)
         for item in running[:]:
@@ -648,11 +672,19 @@ def render(job, spec, workers=6, start=0.0, end=None, chunk_seconds=8.0):
                 failed.append(i)
     if failed:
         raise SystemExit(f'render failed: chunks {failed} (see work/render/seg/*.log)')
-    lst = seg / 'list.txt'
-    lst.write_text(''.join(f"file '{c}'\n" for c in chunks))
-    dest = job / 'work/render/video.mp4'
-    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', str(lst), '-c', 'copy', str(dest)], check=True)
-    print(f'wrote {dest} ({F1 - F0} frames in {time.time() - t0:.0f} s)')
+    dest, master = job / 'work/render/video.mp4', job / 'work/render/master.mp4'
+    masters = [frames.master_path(c) for c in chunks] if encoder == 'x264' else []
+    masters = masters if masters and all(m.exists() for m in masters) else []
+    for parts, out in [(chunks, dest)] + ([(masters, master)] if masters else []):
+        lst = seg / f'list-{out.stem}.txt'
+        lst.write_text(''.join(f"file '{c}'\n" for c in parts))
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', str(lst), '-c', 'copy', str(out)], check=True)
+    if not masters and master.exists():
+        master.unlink()                              # a master from an older render would not match this video
+    secs = time.time() - t0
+    (job / 'work/render/info.json').write_text(json.dumps({'encoder': encoder, 'frames': F1 - F0, 'seconds': round(secs, 1),
+                                                           'rendered_at': time.strftime('%Y-%m-%dT%H:%M:%S%z')}))
+    print(f'wrote {dest}' + (' and master.mp4' if masters else '') + f' ({F1 - F0} frames in {secs:.0f} s, {encoder})')
     return dest
 
 
@@ -696,14 +728,31 @@ def finalize(job, spec):
     else:  # a silent track, so every platform accepts the file
         audio = ['-f', 'lavfi', '-t', str(timing['duration']), '-i', 'anullsrc=r=48000:cl=stereo']
     comment = 'comment=AI-generated narration (VoxCPM2 designed voice)' if voice_of(spec) else 'comment=sweety-statechart-video'
-    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', str(video), *audio, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k',
-                    '-shortest', '-movflags', '+faststart', '-metadata', comment, str(dest)], check=True)
+    import aigc                                      # GB 45438 implicit label: AIGC in moov.udta.meta (see aigc.py)
+    label = aigc.identity(job, spec)
+    aigc.save(job, label)
+    meta = ['-metadata', comment, *aigc.ffmpeg_args(label), '-movflags', '+faststart+use_metadata_tags']
+    master, master_out = work / 'render/master.mp4', outd / 'film-master.mp4'
+    for src, out, abr in [(video, dest, '192k')] + ([(master, master_out, '320k')] if master.exists() else []):
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', str(src), *audio, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', abr,
+                        '-shortest', *meta, str(out)], check=True)
+    if not master.exists() and master_out.exists():
+        master_out.unlink()                          # from an older render
     (outd / 'editing').mkdir(exist_ok=True)
+    if mix and mix.exists():                         # the narration-bearing mix, for editors, labelled too
+        shutil.copy(mix, outd / 'editing/audio.wav')
+        aigc.tag_wav(outd / 'editing/audio.wav', label)
+    for f in sorted((outd / 'posters').glob('*.png')) + [outd / 'cover.png']:
+        if f.exists():
+            aigc.tag_png(f, label)
     rows = [f"{i + 1}\n{srt_time(s['t0'])} --> {srt_time(s['t1'])}\n{s['note']}\n" for i, s in enumerate(timing['steps']) if s['note']]
     (outd / 'editing/captions.srt').write_text('\n'.join(rows))
     (outd / 'script.txt').write_text('\n'.join(f"{s['tag']}  {s['note']}" for s in timing['steps']))
     probe = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration,size', '-of', 'json', str(dest)], capture_output=True, text=True)
     print('delivered', dest, json.dumps(json.loads(probe.stdout or '{}').get('format', {})))
+    if master_out.exists():
+        print('upload master', master_out, f'{master_out.stat().st_size / 1e6:.1f} MB')
+    print('AIGC', aigc.value(aigc.read(dest) or {}))
     return dest
 
 
@@ -717,7 +766,12 @@ def all_steps(job, spec, workers=6):
     plan(job, spec)
     render(job, spec, workers=workers)
     posters(job, spec)
-    return finalize(job, spec)
+    dest = finalize(job, spec)
+    import deliver, publish                                    # extra outputs: film.json "deliver"; the publish pack
+    if spec.get('deliver'):
+        deliver.deliver(job, spec, spec['deliver'])
+    publish.publish(job, spec)
+    return dest
 
 
 # ------------------------------------------------------------------ new job
@@ -781,17 +835,25 @@ def main():
     ap.add_argument('--end', type=float)
     ap.add_argument('--title')
     ap.add_argument('--redo')
+    ap.add_argument('--encoder', help='render: x264 (default), webcodecs or legacy')
+    ap.add_argument('--what', help='deliver: clips,longimage,html,gif,site,social (default: film.json "deliver", else all)')
+    ap.add_argument('--port', type=int, default=8765, help='preview: port on 127.0.0.1')
+    ap.add_argument('--open', action='store_true', help='preview: open it in the default browser')
+    ap.add_argument('--update', action='store_true', help='golden: store the current frames as the new baseline')
     a = ap.parse_args()
     if a.cmd == 'voices':
         return list_voices()
     if a.cmd == 'new':
         return new_job(a.jobs[0], a.title)
-    browser = ('layout', 'stills', 'render', 'posters', 'all', 'batch', '_chunk')
+    browser = ('layout', 'stills', 'render', 'posters', 'all', 'batch', '_chunk', 'deliver', 'golden')
     if a.cmd in browser and need_render_python() and Path(RENDER_PY).exists() and sys.executable != RENDER_PY:
         os.execv(RENDER_PY, [RENDER_PY, __file__, *sys.argv[1:]])
     if a.cmd == '_chunk':
         job, spec = load(a.jobs[0])
-        return render_chunk(job, spec, int(a.jobs[1]), int(a.jobs[2]), Path(a.jobs[3]))
+        return render_chunk(job, spec, int(a.jobs[1]), int(a.jobs[2]), Path(a.jobs[3]), *a.jobs[4:5])
+    if a.cmd == 'golden':                                      # the three examples; no JOB
+        import golden
+        sys.exit(golden.run(update=a.update, examples=a.jobs or None))
     if a.cmd == 'batch':
         summary = []
         for j in a.jobs:
@@ -818,11 +880,20 @@ def main():
     elif a.cmd == 'stills':
         stills(job, spec, times=[float(x) for x in a.at.split(',')] if a.at else None, tw=a.width)
     elif a.cmd == 'render':
-        render(job, spec, workers=a.workers, start=a.start, end=a.end)
+        render(job, spec, workers=a.workers, start=a.start, end=a.end, encoder=a.encoder)
     elif a.cmd == 'posters':
         posters(job, spec)
     elif a.cmd == 'finalize':
         finalize(job, spec)
+    elif a.cmd == 'deliver':
+        import deliver
+        deliver.deliver(job, spec, a.what)
+    elif a.cmd == 'publish':
+        import publish
+        publish.publish(job, spec)
+    elif a.cmd == 'preview':
+        import preview
+        preview.serve(job, a.port, a.open)
     elif a.cmd == 'all':
         all_steps(job, spec, workers=a.workers)
     else:
