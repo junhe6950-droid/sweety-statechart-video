@@ -56,8 +56,16 @@
         let target;
         if (i === 0) target = 0;
         else if (st.si === 0 && this.opts.settle !== false) target = st.ci * this.PH;   // a new chapter: its poster settles at the top
-        else if (rel > this.vh * .22 && rel < this.vh * .72) return;
         else target = y - this.vh * .55;
+        // inside a chapter the camera stays on its poster (the whole poster nearly fits a 3:4 frame); the exit
+        // step may scroll on into the next one, as the reference page does
+        const L = this.f.chapters[st.ci].L, exit = st.s.go.some(id => (L.edges.find(e => e.id === id) || {}).kind === 'exit');
+        if (this.opts.settle !== false && !exit && i > 0) {
+          const lo = st.ci * this.PH, hi = lo + Math.max(0, this.PH - this.vh);
+          const inside = cur >= lo - .5 && cur <= hi + .5;
+          if (inside && rel > this.vh * .22 && rel < this.vh * .72 && st.si !== 0) return;
+          target = Math.max(lo, Math.min(hi, target));
+        } else if (i > 0 && rel > this.vh * .22 && rel < this.vh * .72) return;
         target = Math.max(0, Math.min(maxScroll, target));
         if (Math.abs(target - cur) < .5) return;
         segs.push({ t0: st.t0, d: Math.min(1.6, .6 + Math.abs(target - cur) * this.k / 1500), from: cur, to: target });

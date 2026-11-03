@@ -37,6 +37,7 @@
   const tooth = new Map();
   const scratch = document.createElement('canvas').getContext('2d');
   function grain(color, holes = .42) {
+    color = C[color] || color;                 // palette names work everywhere
     const key = color + '|' + holes;
     let p = tooth.get(key);
     if (p) return p;
