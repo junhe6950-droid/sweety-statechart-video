@@ -3,7 +3,7 @@
 (async function () {
   const K = window.SCV;
   try {
-    const want = ['20px "Special Elite"', 'italic 20px "Courier Prime"', '20px "Courier Prime"', '20px "SCV Hand"', 'italic 20px "SCV Hand"', '20px "SCV Type"', '20px "SCV Fangsong"', '20px "SCV Marker"'];
+    const want = ['20px "Special Elite"', 'italic 20px "Courier Prime"', '20px "Courier Prime"', '20px "SCV Hand"', 'italic 20px "SCV Hand"', '20px "SCV Type"', '20px "SCV Fangsong"', '20px "SCV Marker"', '20px "Kevin Serif"', 'bold 20px "Kevin Serif"', '20px "Kevin Sans"'];
     await Promise.all(want.map(f => document.fonts.load(f, '状态图 ABC 123').catch(() => null)));
     await document.fonts.ready;
     const film = K.film.build(window.FILM, window.SCENES || {});

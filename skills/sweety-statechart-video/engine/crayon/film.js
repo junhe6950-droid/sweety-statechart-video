@@ -31,11 +31,28 @@
       const acc = K.theme ? K.theme.accent(ci) : { pins: ['pink'], tint: 'sky' };
       Object.values(ch.states).forEach((st, k) => { if (!st.pin) st.pin = st.kind === 'error' ? 'red' : st.kind === 'final' ? 'green' : acc.pins[k % acc.pins.length]; });
       ch.accent = acc;
+      // how the chart is drawn: a card look per state (chapter / film default), thread or pencil-line arrows
+      const look = ch.look || f.look;
+      Object.values(ch.states).forEach(st => { if (!st.look && look) st.look = look; });
+      ch.arrows = ch.arrows || f.arrows || (look === 'ticket-thread' ? 'thread' : 'line');
+      Object.values(ch.states).forEach(st => { if (st.look === 'ticket-thread') st.look = 'ticket'; });
       const seen = {};
       ch.edges = (ch.edges || []).map(e => {
         const base = e.from + '>' + e.to; seen[base] = (seen[base] || 0) + 1;
         return { ...e, id: e.id || (seen[base] > 1 ? base + '#' + seen[base] : base), text: K.layout.edgeText(e) };
       });
+      if (ch.regions && ch.regions.lanes && ch.regions.lanes.length > 1) {
+        // a guard that waits on another region is written in that region's colour (an edge may name it with "waits")
+        const lanes = ch.regions.lanes, laneOf = {};
+        lanes.forEach(l => l.states.forEach(x => laneOf[x] = l));
+        ch.edges.forEach(e => {
+          if (!e.if && !e.waits) return;
+          const own = laneOf[e.from];
+          let dep = e.waits ? lanes.find(l => l.id === e.waits) : null;
+          if (!dep) dep = lanes.find(l => l !== own && (l.title && e.if.includes(l.title) || l.states.some(x => ch.states[x] && ch.states[x].label && e.if.includes(ch.states[x].label))));
+          if (dep) e.waitsLane = dep.id;
+        });
+      }
       if (ch.regions) {
         ch.regions.id = ch.regions.id || 'together';
         ch.regions.lanes.forEach((ln, k) => { ln.start = ln.start || ln.states[0]; ln.tint = ln.tint || K.theme && ['sky', 'rose', 'mint', 'straw', 'lilac'][(ch.index + k) % 5]; });
@@ -123,16 +140,49 @@
     return { list: out, done };
   }
 
-  /* ---------------- the rule chapter's red path ---------------- */
+  /* ---------------- the rule chapter's red paths ---------------- */
+  // every broken rule's shortest path (the checker's rules[i].result, or the single rule's path) as routes, plus the
+  // states and arrows on it (they get a red double edge and a pale red wash under the arrow)
+  function rulesOf(ch) {
+    const list = ch.rules ? ch.rules.slice() : [];
+    if (ch.rule && !list.some(r => r === ch.rule)) list.unshift(Object.assign({ result: ch.rule.path ? { holds: false, path: ch.rule.path } : null }, ch.rule));
+    return list;
+  }
   function tracePath(ch, L) {
-    const path = ch.rule && ch.rule.path;
-    if (!path || path.length < 2) return [];
-    const routes = [];
-    for (let i = 1; i < path.length; i++) {
-      const e = L.edges.find(x => x.from === path[i - 1] && x.to === path[i]);
-      if (e) routes.push(e.route);
+    const routes = [], states = new Set(), edges = new Set();
+    for (const r of rulesOf(ch)) {
+      const path = (r.result && r.result.path) || (r === ch.rule && ch.rule.path);
+      if (!path || path.length < 2 || (r.result && r.result.holds)) continue;
+      const one = [];
+      for (let i = 1; i < path.length; i++) {
+        const e = L.edges.find(x => x.from === path[i - 1] && x.to === path[i]);
+        if (e) { one.push(e.route); edges.add(e.id); }
+      }
+      path.forEach(x => states.add(x));
+      if (one.length) routes.push(one);
     }
-    return routes;
+    ch.bug = { states, edges };
+    return routes.length === 1 ? routes[0] : routes.flat ? routes.reduce((a, r) => a.concat(r), []) : [];
+  }
+  function traceRoutes(ch, L) {                     // one polyline list per broken rule
+    const out = [];
+    for (const r of rulesOf(ch)) {
+      const path = (r.result && r.result.path) || (r === ch.rule && ch.rule.path);
+      if (!path || path.length < 2 || (r.result && r.result.holds)) continue;
+      const one = [];
+      for (let i = 1; i < path.length; i++) { const e = L.edges.find(x => x.from === path[i - 1] && x.to === path[i]); if (e) one.push(e.route); }
+      if (one.length) out.push(one);
+    }
+    return out;
+  }
+  // the legend of a rule chapter: each rule, whether it holds, the red line, and how much the checker looked at
+  function legendLines(ch) {
+    const rules = rulesOf(ch);
+    if (!rules.length || ch.legend === false || (ch.rule && ch.rule.legend === false)) return null;
+    const label = id => (ch.states[id] && ch.states[id].label) || id;
+    const lines = rules.map(r => ({ text: r.text || (r.never ? `永远不能「${label(r.never)}」` : r.always ? `一直要满足 ${r.always}` : r.stuck === false ? '不会卡住' : ''), holds: r.result ? r.result.holds : null }));
+    const checked = ch.checked || (ch.rule && ch.rule.checked) || null;
+    return { lines, checked };
   }
 
   /* ---------------- build ---------------- */
@@ -152,7 +202,15 @@
       ch.L = L;
       ch.S = steps(ch, L);
       ch.trace = tracePath(ch, L);
+      ch.traces = traceRoutes(ch, L);
       L.free = K.layout.freeAreas(L, f.W, f.H, L.header);
+      const lg = legendLines(ch);
+      if (lg) {                                         // reserve a corner for the legend before scenes see the free areas
+        const w = 300, h = 58 + 30 * lg.lines.length + 30 + (lg.checked ? 26 : 0);
+        const fits = L.free.filter(r => r.x1 - r.x0 >= w + 10 && r.y1 - r.y0 >= h + 10).sort((a, b) => (a.y0 - a.x1 * .4) - (b.y0 - b.x1 * .4));
+        const at = ch.legendAt || (fits[0] ? [fits[0].x1 - w - 6, fits[0].y0 + 6] : null);
+        if (at) { L.legend = { x0: at[0], y0: at[1], x1: at[0] + w, y1: at[1] + h, lines: lg.lines, checked: lg.checked }; L.reserved = [L.legend]; L.free = K.layout.freeAreas(L, f.W, f.H, L.header); }
+      }
       ch.scene = (scenes && (scenes[ch.id] || scenes[String(ci + 1)] || scenes[ci + 1])) || {};
       // the step that first enters the regions box: the box is drawn on then, not before
       const lanes = ch.regions ? ch.regions.lanes.flatMap(l => l.states) : [];
@@ -219,6 +277,13 @@
       if (ch.sub) K.words(g, ch.sub, 58, 186, { size: 21, alpha: K.clamp((tt - .7) / .4), color: C.title });
       if (ch.tagline) K.text(g, ch.tagline, 58, 212, { font: `italic 15px ${FONT.mono}`, color: C.guard, alpha: K.clamp((tt - .9) / .4) });
     }
+    if (ch.L.legend && (full || si >= 0)) {
+      const tr = ch.S.list.findIndex(x => x.trace), shown = full || (tr >= 0 ? si > tr || (si === tr && t > 1.4) : si >= 0);
+      const fixed = ch.fixAt >= 0 && (full || si > ch.fixAt || (si === ch.fixAt && t > 1.6));
+      g.save(); g.globalAlpha *= full || si > 0 ? 1 : K.clamp((t - .6) / .5);
+      K.chart.legend(g, ch.L.legend, { shown, fixed });
+      g.restore();
+    }
     for (const k of ch.L.containers) {
       const at = ch.boxAt;
       const p = full || at < 0 ? 1 : si < at ? 0 : si > at ? 1 : K.clamp(t / .85);
@@ -241,21 +306,27 @@
       d.type === 'start' ? K.chart.startDot(g, d, { alpha: a }) : K.chart.endDot(g, d, { alpha: a });
     }
     const beads = [], fade = opts.fade && si < list.length;
+    const traced = ch.trace.length && (s.trace || si >= list.length || list.slice(0, si).some(x => x.trace));
     const hot = new Set(s.go.concat(L.edges.filter(e => s.on.includes(e.to)).map(e => e.id)));
     for (const e of L.edges) {
       const now = s.go.includes(e.id), seen = s.seenE.has(e.id);
       if (!seen && !now) continue;
-      const past = fade && !hot.has(e.id);
-      K.chart.arrow(g, e, seen ? 1 : ep, past ? { color: C.past, alpha: .7 } : {});
+      const past = fade && !hot.has(e.id), thread = ch.arrows === 'thread';
+      const showBug = ch.bug && ch.bug.edges.has(e.id) && traced;
+      if (showBug) K.chart.wash(g, e, seen ? 1 : ep);
+      K.chart.arrow(g, e, seen ? 1 : ep, Object.assign(thread ? { color: C.redD, w: 1.8, stop: 7, head: .8 } : ch.arrows === 'pencil' ? { stop: 6 } : {}, past ? { color: C.past, alpha: .7 } : {}));
       const fixHere = fix && fixed && e.id === (fix.edge || '') ? fix.if || fix.when || '' : null;
+      const lane = e.waitsLane && ch.regions ? ch.regions.lanes.find(l => l.id === e.waitsLane) : null;
+      const STRONG = { sky: 'blue', rose: 'pink', mint: 'teal', straw: 'ochre', lilac: 'violet' };   // a region's tint -> its ink
+      const guardColor = lane ? K.toward(K.chart.colour(STRONG[lane.tint] || lane.tint || 'blue'), C.ink, .2) : null;
       if (e.lab) K.chart.edgeWords(g, e, seen ? 1e9 : K.clamp((t - .45) / 1.1) * K.charCount(e.text),
-        Object.assign(past ? { alpha: .6 } : {}, fixHere ? { fix: fixHere, fixChars: K.clamp((fixT - .2) / .9) * (K.charCount(fixHere) + 2) } : {}));
+        Object.assign(past ? { alpha: .6 } : {}, guardColor ? { guardColor } : {}, fixHere ? { fix: fixHere, fixChars: K.clamp((fixT - .2) / .9) * (K.charCount(fixHere) + 2) } : {}));
       if (now && !arrived) beads.push(K.along(e.route, ep));
     }
-    if (ch.trace.length && (s.trace || si >= list.length || list.slice(0, si).some(x => x.trace))) {
+    if (traced) {
       const prog = s.trace ? K.ease(K.clamp(t / 1.6)) : 1;
       const alpha = fixed ? .85 - .6 * K.clamp((fixT - .6) / 1) : .85;   // after the fix the red path fades to a ghost
-      K.chart.trace(g, ch.trace, prog, ch.index, alpha);
+      (ch.traces && ch.traces.length ? ch.traces : [ch.trace]).forEach((r, k) => K.chart.trace(g, r, prog, ch.index * 10 + k, alpha));
     }
     const never = ch.rule && ch.rule.never;
     for (const [id, b] of Object.entries(L.boxes)) {
@@ -272,7 +343,9 @@
       const wasOn = si > 0 && si < list.length && list[si - 1].on.includes(id);
       const ring = on && arrived ? (wasOn ? 1 : K.clamp((t - 1.05) / .55)) : 0;
       const bad = id === never && (on || si >= list.length) && !(fixed && fixT > 1.6);
-      K.chart.ticket(g, b, { active: on && arrived, at: t, pop, squash, drop, swing: swing != null && swing >= 0 ? swing : null, ring, alpha: pop < 1 ? K.clamp((t - .85) / .25) : 1, bad, past: fade && !on && b.kind !== 'final' });
+      const lane = b.lane && ch.regions ? ch.regions.lanes.find(l => l.id === b.lane) : null;
+      K.chart.ticket(g, b, { active: on && arrived, at: t, pop, squash, drop, swing: swing != null && swing >= 0 ? swing : null, ring, alpha: pop < 1 ? K.clamp((t - .85) / .25) : 1, bad, past: fade && !on && b.kind !== 'final',
+        onBug: traced && ch.bug && ch.bug.states.has(id) && !(fixed && fixT > 1.6), tint: (lane && lane.tint) || (ch.states[id] && ch.states[id].tint) });
     }
     for (const q of beads) K.chart.bead(g, q[0], q[1], T);
     const stampAt = stampStep(ch);

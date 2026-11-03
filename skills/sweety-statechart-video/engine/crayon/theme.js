@@ -53,27 +53,44 @@
         title: '#1f1a14', cardInk: '#1f1a14', card: '#fbf2dc', bg: '#b8935e',
       },
     },
+    // pen and coloured pencil (after Kevin Ngo's "The business of boba"): a thin dark pen line, soft pastel pencil,
+    // warm paper, slanted serif words, no crayon wax
+    pencil: {
+      name: '钢笔彩铅', paper: 'cream', blend: 'multiply', type: 'pen', stroke: { w: .52, amp: .45, passes: 1 }, fill: { alpha: .72, gap: .78, base: .7 }, inkText: false,
+      colors: {
+        paper: '#f5efe3', ink: '#2f2a2c', inkD: '#2f2a2c', navy: '#2f2a2c', black: '#2f2a2c', title: '#2f2a2c', cardInk: '#2f2a2c',
+        pink: '#e0627a', rose: '#f2a7b5', red: '#c4473b', redD: '#a83a30', guard: '#b5453a', active: '#d9576f',
+        blue: '#6f8fc9', blueL: '#a9c1e6', sky: '#cfdcf0', straw: '#f0cf7a', yolk: '#f6dd95', ochre: '#d9a54a', orange: '#ec9a5c', flame: '#f2b25a',
+        green: '#9fc98a', greenD: '#6f9e63', leaf: '#8cbc7a', teal: '#78bfb2', mint: '#bfe3d3', lilac: '#c3b8e6', violet: '#9b8bd1',
+        cream: '#f6e8c8', creamD: '#eadbb6', peach: '#f3cfae', skin: '#f6d2b8', skinD: '#e8b496', tan: '#d2a679', brown: '#a87650', grey: '#bdb7c9',
+        white: '#fffdf8', card: '#fdfaf2', bg: '#e8e1d3',
+      },
+    },
     riso: {
-      name: '孔版', paper: 'cream', blend: 'multiply', misreg: 1.4,
-      colors: {                                            // three inks (fluorescent pink, blue, yellow) and their overprints
-        paper: '#f6f1e6', ink: '#1d5fc4', inkD: '#16489a', navy: '#173f87', blue: '#1d5fc4', blueL: '#6f9be0', sky: '#a9c6ef',
-        pink: '#ff3d9a', rose: '#ff7ab8', red: '#f2365f', redD: '#c81f48', straw: '#ffd21f', yolk: '#ffe14d', ochre: '#f2a51f',
-        orange: '#ff8a3d', flame: '#ffb11f', green: '#4fb3a0', greenD: '#2f8f84', leaf: '#5fbf8f', teal: '#3fb8c4', mint: '#a6e3d6',
-        lilac: '#b08ee6', violet: '#7a5ad8', grey: '#b7b2cc', title: '#173f87', cardInk: '#173f87',
+      name: '孔版', paper: 'cream', blend: 'multiply', misreg: 3.2,
+      colors: {                                            // three inks (riso blue, fluorescent pink, yellow) and their overprints
+        paper: '#f7f4ec', ink: '#0078bf', inkD: '#005b94', navy: '#004f86', blue: '#0078bf', blueL: '#5aa6d9', sky: '#a6cfee',
+        pink: '#ff48b0', rose: '#ff8fcc', red: '#ff3b6b', redD: '#e0245a', straw: '#ffe800', yolk: '#fff066', ochre: '#ffb000',
+        orange: '#ff6c2f', flame: '#ffb000', green: '#00a95c', greenD: '#00864a', leaf: '#3dbb75', teal: '#00a3a6', mint: '#8fdcc4',
+        lilac: '#b08ee6', violet: '#765ba7', grey: '#9fb6c8', tan: '#e8a06b', brown: '#b5643c', cream: '#fff1b8', creamD: '#ffe27a',
+        skin: '#ffc1b0', skinD: '#ff9c8a', black: '#004f86', title: '#004f86', cardInk: '#004f86', card: '#fffbf0', past: '#9fb6c8',
       },
     },
   };
-  const SEASONS = {                                        // scene accents only; the chart's meaning colours stay
-    spring: { green: '#9edc6a', leaf: '#6ccb5a', greenD: '#43a84c', rose: '#ff8cb3', sky: '#c4def9', straw: '#f7d65a', blueL: '#9cc2f5' },
-    summer: { teal: '#38d6c2', mint: '#a8f2de', yolk: '#ffe04d', straw: '#ffcf2e', orange: '#ff8a1e', sky: '#a9d8ff', leaf: '#45c25a' },
-    autumn: { ochre: '#dd8a17', orange: '#f0701c', straw: '#e8b43a', green: '#a7b24a', leaf: '#93a83c', greenD: '#6f8a2c', tan: '#c07a3e', brown: '#8c4a22', sky: '#d6dcf0' },
-    winter: { sky: '#d7e4f7', blueL: '#a9c1ea', lilac: '#b9b4ee', grey: '#c3c4dc', green: '#8fbfa0', leaf: '#77ad8c', straw: '#e8d58a', white: '#ffffff' },
+  const SEASONS = {                                        // scene accents and the paper's warmth; the chart's meaning colours stay
+    spring: { paper: '#f6f4e6', green: '#9edc6a', leaf: '#6ccb5a', greenD: '#43a84c', rose: '#ff8cb3', sky: '#c4def9', straw: '#f7d65a', blueL: '#9cc2f5', blue: '#3a6fe0', cream: '#fdf0d0' },
+    summer: { paper: '#f8f2de', teal: '#38d6c2', mint: '#a8f2de', yolk: '#ffe04d', straw: '#ffcf2e', orange: '#ff8a1e', sky: '#a9d8ff', leaf: '#45c25a', blue: '#1f7fe0', blueL: '#7cc0ff' },
+    autumn: { paper: '#f4ead8', ink: '#3a3f9c', inkD: '#2b2f7a', ochre: '#dd8a17', orange: '#e8631a', straw: '#e8b43a', yolk: '#f0c860', green: '#a7b24a', leaf: '#93a83c', greenD: '#6f8a2c', tan: '#c07a3e', brown: '#8c4a22', sky: '#d6dcf0', blue: '#4a56b8', blueL: '#a0a8e0', lilac: '#c9a0c8', cream: '#f8e4c0' },
+    winter: { paper: '#f1f3f5', sky: '#d7e4f7', blueL: '#a9c1ea', lilac: '#b9b4ee', grey: '#c3c4dc', green: '#8fbfa0', leaf: '#77ad8c', straw: '#e8d58a', white: '#ffffff', cream: '#eef1f6', creamD: '#dde3ec', orange: '#e58a6a' },
   };
   const TYPES = {
     serif: '"Special Elite", "SCV Type", serif',
     fangsong: '"Special Elite", "SCV Fangsong", "SCV Type", serif',
     marker: '"Special Elite", "SCV Marker", "SCV Type", sans-serif',
+    pen: '"Kevin Serif", "SCV Fangsong", "SCV Type", serif',
   };
+  const MONOS = { pen: '"Kevin Serif", "SCV Fangsong", "SCV Hand", serif' };
+  const BASE_MONO = FONT.mono;
 
   // 1–3 brand colours -> a theme: the darkest one (pushed dark enough) inks the lines and text, the most chromatic
   // one becomes the active colour, a third (or a hue-shifted second) the warm accent; meaning colours keep apart
@@ -84,7 +101,8 @@
     const dark = oklch(byL[0]), ink = fromOklch([Math.min(dark[0], .42), Math.max(dark[1], .08), dark[2]]);
     const inkD = fromOklch([Math.min(dark[0], .34), Math.max(dark[1], .07), dark[2]]), navy = fromOklch([Math.min(dark[0], .28), Math.max(dark[1], .06), dark[2]]);
     const act = oklch(byC[0]), active = fromOklch([Math.max(.55, Math.min(.68, act[0])), Math.max(.16, act[1]), act[2]]);
-    const third = cs.length > 2 ? oklch(byC[2] || byC[1]) : [.84, .14, act[2] + 2.2];
+    const rest = cs.filter(c => c !== byL[0] && c !== byC[0]);       // neither the ink nor the active colour
+    const third = rest.length ? oklch(rest[0]) : [.84, .14, act[2] + 2.2];
     const warm = fromOklch([Math.max(.78, third[0]), Math.max(.12, third[1]), third[2]]);
     const colors = { ink, inkD, navy, blue: ink, title: navy, cardInk: navy, active, pink: active, rose: mix(active, '#ffffff', .35), straw: warm, yolk: mix(warm, '#ffffff', .25) };
     // guard red and ok green must stay readable as meanings next to the brand's active colour
@@ -105,7 +123,8 @@
       over = t;
     }
     const colors = Object.assign({}, base.colors, over.colors || {});
-    return { name: over.name || base.name, paper: over.paper || base.paper, blend: over.blend || base.blend, type: over.type || base.type || 'serif', misreg: over.misreg ?? base.misreg ?? 0, colors };
+    return { name: over.name || base.name, paper: over.paper || base.paper, blend: over.blend || base.blend, type: over.type || base.type || 'serif', misreg: over.misreg ?? base.misreg ?? 0,
+      stroke: Object.assign({}, base.stroke, over.stroke), fill: Object.assign({}, base.fill, over.fill), inkText: over.inkText ?? base.inkText, colors };
   }
 
   // rewrite K.C in place (every module holds the same object), set the type face and the layer mixing
@@ -115,7 +134,10 @@
     Object.assign(C, BASE, ROLES, th.colors);
     C.active = th.colors.active || C.pink; C.guard = th.colors.guard || C.red;
     FONT.type = TYPES[th.type] || TYPES.serif;
+    FONT.mono = MONOS[th.type] || BASE_MONO;
     K.S.blend = th.blend; K.S.paperKind = th.paper; K.S.misreg = th.misreg || 0; K.S.dark = luminance(C.paper) < .25;
+    K.S.penW = th.stroke.w ?? 1; K.S.penAmp = th.stroke.amp ?? 1; K.S.penPasses = th.stroke.passes || 0;
+    K.S.fillAlpha = th.fill.alpha ?? 1; K.S.fillGap = th.fill.gap ?? 1; K.S.fillBase = th.fill.base ?? 1; K.S.inkText = th.inkText !== false;
     K.mixCache && K.mixCache.clear();
     K.theme.current = th;
     return th;

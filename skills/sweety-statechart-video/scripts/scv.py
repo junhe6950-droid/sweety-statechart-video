@@ -7,6 +7,7 @@ usage: scv.py <command> JOB [options]
   new       JOB [--title T]   a job folder with a film.json and scenes.js to fill in
   check     JOB               structure, step references, captions, the rule checker (it finds the red path)
   layout    JOB               every chapter's finished poster with a grid + free areas (work/layout/), for scenes.js
+  lint      JOB               picture checks with fixes: overlaps, blank paper, still steps, people, theme (work/lint.json)
   lines     JOB               work/lines.json: one narration line per captioned step
   voice     JOB [--redo ID]   synthesize, gate and ASR-check the lines (scripts/voice.py, MLX Python)
   plan      JOB               step times (from the voice, or the reference pace), work/timing.json + timeline.json
@@ -64,7 +65,7 @@ def frame_size(spec):
     if r >= 1:
         return 1080, round(1080 * r / 2) * 2
     return round(1080 / r / 2) * 2, 1080
-ENGINE_FILES = ['ink.js', 'theme.js', 'chart.js', 'layout.js', 'people.js', 'props.js', 'motion.js', 'film.js', 'player.js', 'main.js']
+ENGINE_FILES = ['ink.js', 'theme.js', 'chart.js', 'layout.js', 'people.js', 'props.js', 'motion.js', 'film.js', 'player.js', 'lint.js', 'main.js']
 ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
 CAPTION_MAX = 24
 FPS = 30
@@ -311,6 +312,10 @@ def font_css():
 @font-face {{ font-family: 'SCV Type'; src: {song}; }}
 @font-face {{ font-family: 'SCV Fangsong'; src: {fang}; }}
 @font-face {{ font-family: 'SCV Marker'; src: {marker}; }}
+@font-face {{ font-family: 'Kevin Serif'; src: url('{url('KevinSerif-Regular.woff2')}') format('woff2'); font-weight: 400; }}
+@font-face {{ font-family: 'Kevin Serif'; src: url('{url('KevinSerif-Bold.woff2')}') format('woff2'); font-weight: 700; }}
+@font-face {{ font-family: 'Kevin Sans'; src: url('{url('KevinSans-Regular.woff2')}') format('woff2'); font-weight: 400; }}
+@font-face {{ font-family: 'Kevin Sans'; src: url('{url('KevinSans-Bold.woff2')}') format('woff2'); font-weight: 700; }}
 """
 
 
@@ -841,7 +846,7 @@ def main():
         return list_voices()
     if a.cmd == 'new':
         return new_job(a.jobs[0], a.title)
-    browser = ('layout', 'stills', 'render', 'posters', 'all', 'batch', '_chunk')
+    browser = ('layout', 'stills', 'render', 'posters', 'all', 'batch', '_chunk', 'lint')
     if a.cmd in browser and need_render_python() and Path(RENDER_PY).exists() and sys.executable != RENDER_PY:
         os.execv(RENDER_PY, [RENDER_PY, __file__, *sys.argv[1:]])
     if a.cmd == '_chunk':
@@ -864,6 +869,9 @@ def main():
         sys.exit(1 if check(job, spec)['errors'] else 0)
     elif a.cmd == 'layout':
         layout(job, spec)
+    elif a.cmd == 'lint':
+        import lint as lint_mod
+        sys.exit(1 if lint_mod.lint(job, spec)['issues'] else 0)
     elif a.cmd == 'lines':
         write_lines(job, spec)
     elif a.cmd == 'voice':

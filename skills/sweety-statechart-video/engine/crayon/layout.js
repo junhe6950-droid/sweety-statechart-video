@@ -364,7 +364,7 @@
   function chapter(ch, W, H, header) {
     const items = {};
     const GAPV = Math.round(GAP + Math.max(0, H - 1000) * .06);
-    const box = (id, st) => ({ id, kind: 'box', label: st.label || id, tag: st.tag, pin: st.pin, w: boxWidth(st), h: TH, at: st.at, size: st.size, skind: st.kind, mood: st.mood });
+    const box = (id, st) => ({ id, kind: 'box', label: st.label || id, tag: st.tag, pin: st.pin, w: boxWidth(st), h: TH, at: st.at, size: st.size, skind: st.kind, mood: st.mood, look: st.look });
     for (const [id, st] of Object.entries(ch.states)) items[id] = box(id, st);
     for (const e of ch.edges) if (e.to === 'end' || /^end\d*$/.test(e.to)) items[e.to] = items[e.to] || { id: e.to, kind: 'end', w: 30, h: 30 };
     const container = ch.regions ? ch.regions.id : null;
@@ -506,11 +506,11 @@
       edges.forEach(e => { penalty += Math.max(0, (e.penalty || 0) - 2500); if (e.lab) penalty += e.lab.penalty >= 2500 ? e.lab.penalty : 0; });
       const boxes = {}, dots = {};
       for (const n of Object.values(N)) {
-        if (n.kind === 'box') boxes[n.id] = { id: n.id, x: n.x, y: n.y, w: n.w, h: TH, label: n.label, tag: n.tag, pin: n.pin, size: n.size, lane: n.lane, kind: n.skind, mood: n.mood };
+        if (n.kind === 'box') boxes[n.id] = { id: n.id, x: n.x, y: n.y, w: n.w, h: TH, label: n.label, tag: n.tag, pin: n.pin, size: n.size, lane: n.lane, kind: n.skind, mood: n.mood, look: n.look };
         else if (n.kind === 'end' || n.kind === 'start') dots[n.id] = { id: n.id, type: n.kind, x: n.x, y: n.y };
       }
-      const outEdges = edges.concat(inner, extra).map(e => ({ id: e.id, from: e.from, to: e.to, kind: e.kind, text: e.text || '', pts: e.pts, route: K.rounded(e.pts, 16), lab: e.lab || null, noHead: !!e.noHead }));
-      const containers = K0 ? [(() => { const k = N[container]; return { id: k.id, x0: k.box.x0, y0: k.box.y0, x1: k.box.x1, y1: k.box.y1, title: k.title, dividers: k.dividers, regions: k.regions.map(r => ({ id: r.lane.ln.id, x0: r.X0, y0: r.Y0, x1: r.X1, y1: r.Y1, title: r.lane.ln.title, tint: r.lane.ln.tint })) }; })()] : [];
+      const outEdges = edges.concat(inner, extra).map(e => ({ id: e.id, from: e.from, to: e.to, kind: e.kind, text: e.text || '', pts: e.pts, route: K.rounded(e.pts, 16), lab: e.lab || null, noHead: !!e.noHead, style: e.style, waitsLane: e.waitsLane }));
+      const containers = K0 ? [(() => { const k = N[container]; return { id: k.id, x0: k.box.x0, y0: k.box.y0, x1: k.box.x1, y1: k.box.y1, title: k.title, dividers: k.dividers, look: ch.regions.look, regions: k.regions.map(r => ({ id: r.lane.ln.id, x0: r.X0, y0: r.Y0, x1: r.X1, y1: r.Y1, title: r.lane.ln.title, tint: r.lane.ln.tint, look: r.lane.ln.look })) }; })()] : [];
       return { penalty, boxes, dots, edges: outEdges, containers, offset: [ox, oy], start, entryX: N[start] ? N[start].x : 500, entryNode: start };
     }
   }
@@ -552,6 +552,7 @@
     Object.values(L.dots).forEach(d => mark(R(d.x - 26, d.y - 26, d.x + 26, d.y + 26)));
     L.edges.forEach(e => { segs(e.pts).forEach(s => mark(grow(segRect(s), 14))); if (e.lab && e.lab.box) mark(grow(e.lab.box, 8)); });
     L.containers.forEach(k => mark(R(k.x0 - 12, k.y0 - 12, k.x1 + 12, k.y1 + 12)));
+    (L.reserved || []).forEach(r => mark(grow(r, 10)));        // the rules legend and other fixed furniture
     const found = [];
     for (let k = 0; k < 8; k++) {
       let best = null;

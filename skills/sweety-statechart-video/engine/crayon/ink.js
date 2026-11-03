@@ -25,7 +25,8 @@
   // roles (theme.js rewrites them with the palette): text on paper and on cards, the active colour, guard red, ok green
   Object.assign(C, { title: C.navy, cardInk: C.navy, active: C.pink, guard: C.red, ok: '#178a9a', past: C.grey, card: '#fbf7ec', bg: '#e9e3d6' });
   // drawing state: reveal (0..1, a scene being drawn on), depth ('far' | 'mid' | 'near'), how crayon layers mix
-  const S = { rand: Math.random, boil: 0, reveal: 1, depth: 'mid', blend: 'multiply', paperKind: 'cream', misreg: 0, dark: false };
+  const S = { rand: Math.random, boil: 0, reveal: 1, depth: 'mid', blend: 'multiply', paperKind: 'cream', misreg: 0, dark: false,
+    penW: 1, penAmp: 1, penPasses: 0, fillAlpha: 1, fillGap: 1, fillBase: 1, inkText: true };   // pen/fill: a theme's medium
   const seed = id => { S.rand = prng(fnv(String(id)) + S.boil * 7919); };
   const TIER = { outline: 3.2, structure: 2, detail: 1.2 };     // line widths: outer contour, inner structure, detail
   const named = c => C[c] || c;
@@ -190,7 +191,7 @@
   /* ---------- strokes ---------- */
   // A crayon line: two passes of a wobbling, tooth-filled stroke whose width breathes along the path.
   function line(ctx, pts, o = {}) {
-    const color = depthColor(o.color || C.ink), w = depthW(o.w || 2.6), amp = o.amp ?? 1.1, closed = !!o.closed;
+    const color = depthColor(o.color || C.ink), w = depthW(o.w || 2.6) * S.penW, amp = (o.amp ?? 1.1) * S.penAmp, closed = !!o.closed;
     let P = resample(pts, 4, closed);
     if (closed) P = P.concat(P.slice(1, Math.min(P.length, 3 + ((S.rand() * 5) | 0))));   // the crayon overshoots its start
     const prog = Math.min(o.progress ?? 1, S.reveal);
@@ -201,7 +202,7 @@
     ctx.save();
     layer(ctx); misregister(ctx, color);
     ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = grain(color, o.holes ?? .3);
-    const passes = o.passes || 2, base = (o.alpha ?? 1) * (S.depth === 'far' ? .85 : 1), n = P.length;
+    const passes = S.penPasses || o.passes || 2, base = (o.alpha ?? 1) * (S.depth === 'far' ? .85 : 1), n = P.length;
     // pressure: an open stroke lands a little heavy and lifts off thinner; a closed one keeps its weight
     const press = u => closed || o.taper === false ? 1 : Math.min(1, .62 + u * 5) * Math.min(1, .5 + (1 - u) * 4);
     for (let k = 0; k < passes; k++) {
@@ -225,16 +226,16 @@
     ctx.save(); ctx.clip(shape);
     if (o.solid) { ctx.globalAlpha = Math.min(1, rv * 2); ctx.fillStyle = named(o.solid); ctx.fill(shape); }
     layer(ctx); misregister(ctx, color);
-    if (o.base !== 0) { ctx.globalAlpha = (o.base ?? .5) * rv * (far ? .8 : 1); ctx.fillStyle = grain(color, .5); ctx.fill(shape); }
+    if (o.base !== 0) { ctx.globalAlpha = (o.base ?? .5) * rv * (far ? .8 : 1) * S.fillBase; ctx.fillStyle = grain(color, .5); ctx.fill(shape); }
     ctx.lineCap = 'round';
     for (const ly of (o.layers || [{}])) {
-      const col = depthColor(ly.color || color), gap = (ly.gap || o.gap || 3.4) * (far ? 1.35 : 1), ang = (ly.angle ?? o.angle ?? -1.05) + rnd(-.08, .08);
+      const col = depthColor(ly.color || color), gap = (ly.gap || o.gap || 3.4) * (far ? 1.35 : 1) * S.fillGap, ang = (ly.angle ?? o.angle ?? -1.05) + rnd(-.08, .08);
       const dx = Math.cos(ang), dy = Math.sin(ang), nx = -dy, ny = dx, L = Math.hypot(b.w, b.h) / 2 + 6;
       ctx.strokeStyle = grain(col, .35);
       const stop = -L + 2 * L * rv;                    // drawing on: the hatching sweeps across the shape
       for (let d = -L; d < stop; d += gap * rnd(.65, 1.35)) {
-        ctx.globalAlpha = rnd(.45, .95) * (ly.alpha ?? o.alpha ?? 1) * (far ? .8 : 1);
-        ctx.lineWidth = (ly.w || o.w || 1.9) * rnd(.7, 1.3);
+        ctx.globalAlpha = rnd(.45, .95) * (ly.alpha ?? o.alpha ?? 1) * (far ? .8 : 1) * S.fillAlpha;
+        ctx.lineWidth = (ly.w || o.w || 1.9) * rnd(.7, 1.3) * (S.penW < 1 ? .6 : 1);
         const ox = b.cx + nx * d, oy = b.cy + ny * d;
         let t = -L - rnd(0, 12);
         ctx.beginPath();
