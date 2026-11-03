@@ -22,8 +22,40 @@
   function prng(a) {                       // mulberry32
     return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   }
-  const S = { rand: Math.random, boil: 0 };
+  // roles (theme.js rewrites them with the palette): text on paper and on cards, the active colour, guard red, ok green
+  Object.assign(C, { title: C.navy, cardInk: C.navy, active: C.pink, guard: C.red, ok: '#178a9a', past: C.grey, card: '#fbf7ec', bg: '#e9e3d6' });
+  // drawing state: reveal (0..1, a scene being drawn on), depth ('far' | 'mid' | 'near'), how crayon layers mix
+  const S = { rand: Math.random, boil: 0, reveal: 1, depth: 'mid', blend: 'multiply', paperKind: 'cream', misreg: 0, dark: false };
   const seed = id => { S.rand = prng(fnv(String(id)) + S.boil * 7919); };
+  const TIER = { outline: 3.2, structure: 2, detail: 1.2 };     // line widths: outer contour, inner structure, detail
+  const named = c => C[c] || c;
+  const mixCache = new Map();
+  function toward(c, to, t) {                // mix two #rrggbb colours (anything else is returned as it is)
+    c = named(c);
+    if (typeof c !== 'string' || c[0] !== '#' || !to || to[0] !== '#') return c;
+    const key = c + to + t;
+    let v = mixCache.get(key);
+    if (v) return v;
+    const p = h => { h = h.slice(1); if (h.length === 3) h = h.split('').map(x => x + x).join(''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)); };
+    const a = p(c), b = p(to);
+    v = '#' + a.map((x, i) => Math.round(x + (b[i] - x) * t).toString(16).padStart(2, '0')).join('');
+    mixCache.set(key, v);
+    return v;
+  }
+  // far things are paler and thinner, near ones a little heavier: the cheapest depth there is
+  const depthColor = c => S.depth === 'far' ? toward(c, C.paper, .42) : named(c);
+  const depthW = w => w * (S.depth === 'far' ? .75 : S.depth === 'near' ? 1.12 : 1);
+  function within(key, value, draw) { const old = S[key]; S[key] = value; try { return draw(); } finally { S[key] = old; } }
+  const atDepth = (level, draw) => within('depth', level, draw);
+  const revealing = (p, draw) => within('reveal', clamp(p) * S.reveal, draw);
+  function layer(ctx) {                      // crayon over crayon: multiply on light paper, opaque on dark
+    if (S.blend && S.blend !== 'source-over') ctx.globalCompositeOperation = S.blend;
+  }
+  function misregister(ctx, color) {         // riso: each ink sits a little off register
+    if (!S.misreg) return;
+    const h = fnv(String(color)), a = (h % 628) / 100;
+    ctx.translate(Math.cos(a) * S.misreg, Math.sin(a) * S.misreg);
+  }
   const setBoil = b => { S.boil = b; };
   const rnd = (a = 0, b = 1) => a + (b - a) * S.rand();
   const pick = arr => arr[(S.rand() * arr.length) | 0];
@@ -158,21 +190,25 @@
   /* ---------- strokes ---------- */
   // A crayon line: two passes of a wobbling, tooth-filled stroke whose width breathes along the path.
   function line(ctx, pts, o = {}) {
-    const color = o.color || C.ink, w = o.w || 2.6, amp = o.amp ?? 1.1, closed = !!o.closed;
+    const color = depthColor(o.color || C.ink), w = depthW(o.w || 2.6), amp = o.amp ?? 1.1, closed = !!o.closed;
     let P = resample(pts, 4, closed);
     if (closed) P = P.concat(P.slice(1, Math.min(P.length, 3 + ((S.rand() * 5) | 0))));   // the crayon overshoots its start
-    if (o.progress != null && o.progress < 1) {
-      if (o.progress <= 0) return P;
-      P = P.slice(0, Math.max(2, Math.ceil(P.length * o.progress)));
+    const prog = Math.min(o.progress ?? 1, S.reveal);
+    if (prog < 1) {
+      if (prog <= 0) return P;
+      P = P.slice(0, Math.max(2, Math.ceil(P.length * prog)));
     }
     ctx.save();
+    layer(ctx); misregister(ctx, color);
     ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = grain(color, o.holes ?? .3);
-    const passes = o.passes || 2, base = o.alpha ?? 1;
+    const passes = o.passes || 2, base = (o.alpha ?? 1) * (S.depth === 'far' ? .85 : 1), n = P.length;
+    // pressure: an open stroke lands a little heavy and lifts off thinner; a closed one keeps its weight
+    const press = u => closed || o.taper === false ? 1 : Math.min(1, .62 + u * 5) * Math.min(1, .5 + (1 - u) * 4);
     for (let k = 0; k < passes; k++) {
       const J = wobble(P, amp * (k ? 1.5 : 1)), ph = rnd(0, TAU);
       ctx.globalAlpha = base * (k ? .5 : .95);
       for (let s = 0; s < J.length - 1; s += 10) {
-        ctx.lineWidth = w * (k ? .55 : 1) * (.78 + .38 * (.5 + .5 * Math.sin(s * .07 + ph)));
+        ctx.lineWidth = w * (k ? .55 : 1) * (.78 + .38 * (.5 + .5 * Math.sin(s * .07 + ph))) * press((s + 5) / n);
         ctx.beginPath(); ctx.moveTo(J[s][0], J[s][1]);
         for (let i = s + 1; i <= Math.min(J.length - 1, s + 10); i++) ctx.lineTo(J[i][0], J[i][1]);
         ctx.stroke();
@@ -183,17 +219,21 @@
   }
   // Hatching clipped to a shape: a tooth wash, then layers of broken parallel strokes.
   function hatch(ctx, pts, o = {}) {
-    const color = o.color || C.ink, b = bbox(pts), shape = o.path || path2d(pts);
+    const color = depthColor(o.color || C.ink), b = bbox(pts), shape = o.path || path2d(pts);
+    if (S.reveal <= 0) return;
+    const far = S.depth === 'far', rv = S.reveal;
     ctx.save(); ctx.clip(shape);
-    if (o.solid) { ctx.fillStyle = o.solid; ctx.fill(shape); }
-    if (o.base !== 0) { ctx.globalAlpha = o.base ?? .5; ctx.fillStyle = grain(color, .5); ctx.fill(shape); }
+    if (o.solid) { ctx.globalAlpha = Math.min(1, rv * 2); ctx.fillStyle = named(o.solid); ctx.fill(shape); }
+    layer(ctx); misregister(ctx, color);
+    if (o.base !== 0) { ctx.globalAlpha = (o.base ?? .5) * rv * (far ? .8 : 1); ctx.fillStyle = grain(color, .5); ctx.fill(shape); }
     ctx.lineCap = 'round';
     for (const ly of (o.layers || [{}])) {
-      const col = ly.color || color, gap = ly.gap || o.gap || 3.4, ang = (ly.angle ?? o.angle ?? -1.05) + rnd(-.08, .08);
+      const col = depthColor(ly.color || color), gap = (ly.gap || o.gap || 3.4) * (far ? 1.35 : 1), ang = (ly.angle ?? o.angle ?? -1.05) + rnd(-.08, .08);
       const dx = Math.cos(ang), dy = Math.sin(ang), nx = -dy, ny = dx, L = Math.hypot(b.w, b.h) / 2 + 6;
       ctx.strokeStyle = grain(col, .35);
-      for (let d = -L; d < L; d += gap * rnd(.65, 1.35)) {
-        ctx.globalAlpha = rnd(.45, .95) * (ly.alpha ?? o.alpha ?? 1);
+      const stop = -L + 2 * L * rv;                    // drawing on: the hatching sweeps across the shape
+      for (let d = -L; d < stop; d += gap * rnd(.65, 1.35)) {
+        ctx.globalAlpha = rnd(.45, .95) * (ly.alpha ?? o.alpha ?? 1) * (far ? .8 : 1);
         ctx.lineWidth = (ly.w || o.w || 1.9) * rnd(.7, 1.3);
         const ox = b.cx + nx * d, oy = b.cy + ny * d;
         let t = -L - rnd(0, 12);
@@ -213,12 +253,14 @@
   function radial(ctx, pts, hx, hy, o = {}) {
     const b = bbox(pts), shape = path2d(pts);
     const Rm = Math.hypot(Math.max(Math.abs(b.x0 - hx), Math.abs(b.x1 - hx)), Math.max(Math.abs(b.y0 - hy), Math.abs(b.y1 - hy))) + 4;
+    if (S.reveal <= 0) return;
     ctx.save(); ctx.clip(shape);
-    if (o.solid) { ctx.fillStyle = o.solid; ctx.fill(shape); }
-    ctx.globalAlpha = o.base ?? .6; ctx.fillStyle = grain(o.color, .5); ctx.fill(shape);
-    const cols = o.cols || [o.color], n = o.n || 70, a0 = o.a0 ?? -PI, a1 = o.a1 ?? 0;
+    if (o.solid) { ctx.globalAlpha = Math.min(1, S.reveal * 2); ctx.fillStyle = named(o.solid); ctx.fill(shape); }
+    layer(ctx);
+    ctx.globalAlpha = (o.base ?? .6) * S.reveal; ctx.fillStyle = grain(depthColor(o.color), .5); ctx.fill(shape);
+    const cols = (o.cols || [o.color]).map(depthColor), n = o.n || 70, a0 = o.a0 ?? -PI, a1 = o.a1 ?? 0;
     ctx.lineCap = 'round';
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < Math.ceil(n * S.reveal); i++) {
       const a = a0 + (a1 - a0) * (i + rnd(-.4, .4)) / n, r0 = rnd(0, Rm * (o.inner ?? .1)), r1 = Rm * rnd(.75, 1.05), bend = rnd(-.04, .04);
       ctx.strokeStyle = grain(pick(cols), .35); ctx.globalAlpha = rnd(.5, 1); ctx.lineWidth = (o.w || 1.8) * rnd(.7, 1.4);
       ctx.beginPath(); ctx.moveTo(hx + Math.cos(a) * r0, hy + Math.sin(a) * r0);
@@ -239,12 +281,12 @@
     shape(ctx, ell(x, y, r, r, Math.max(10, (r * 2) | 0)), Object.assign({ fill, w: o.w || 2.2, solid: o.solid, h: { gap: 2.4, base: .7 } }, o));
   }
   function blob(ctx, x, y, r, color, alpha = 1) {      // a soft tooth disc, no outline (cheeks, glows, dust)
-    ctx.save(); ctx.globalAlpha = alpha; ctx.fillStyle = grain(color, .3); ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); ctx.restore();
+    ctx.save(); layer(ctx); ctx.globalAlpha = alpha * S.reveal; ctx.fillStyle = grain(depthColor(color), .3); ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); ctx.restore();
   }
   function scribble(ctx, x, y, w, h, color, o = {}) {  // loose back-and-forth crayon scribble
-    ctx.save(); ctx.strokeStyle = grain(color, .45); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.save(); layer(ctx); ctx.strokeStyle = grain(depthColor(color), .45); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.globalAlpha = o.alpha ?? .5; ctx.lineWidth = o.w || 1.8;
-    const ang = o.angle ?? -.9, n = o.n || 12, L = o.len || 20;
+    const ang = o.angle ?? -.9, n = Math.max(2, Math.ceil((o.n || 12) * S.reveal)), L = o.len || 20;
     ctx.beginPath();
     for (let i = 0; i < n; i++) {
       const t = i / (n - 1), cx = x + w * t, cy = y + h * t + rnd(-3, 3), sg = i % 2 ? 1 : -1;
@@ -259,14 +301,66 @@
     type: '"Special Elite", "SCV Type", "Songti SC", serif',          // titles, ticket labels
     mono: '"Courier Prime", "SCV Hand", "Kaiti SC", monospace',        // notes, edge labels, captions
   };
+  // Typewriter ink: the glyphs are struck onto a small canvas, bled a little, worn by a blotch pattern that shifts
+  // with the boil, then stamped twice (the second strike a hair off). Cached: titles and card labels redraw cheaply.
+  const inked = new Map();
+  let wearTile = null;
+  function wear() {
+    if (wearTile) return wearTile;
+    const n = 180, c = document.createElement('canvas'); c.width = c.height = n;
+    const g = c.getContext('2d'), r = prng(0x51ed);
+    for (let i = 0; i < 340; i++) { g.globalAlpha = r() * .6; g.fillStyle = '#000'; g.beginPath(); g.ellipse(r() * n, r() * n, r() * 2.6 + .4, r() * 1.8 + .3, r() * 3, 0, TAU); g.fill(); }
+    for (let i = 0; i < 1400; i++) { g.globalAlpha = r() * .5; g.fillRect(r() * n, r() * n, 1, 1); }
+    return (wearTile = c);
+  }
+  function inkImage(ctx, str, o, m) {
+    const font = o.font || `22px ${FONT.type}`, color = named(o.color || C.inkD), holes = o.holes ?? .18;
+    const key = [str, font, color, holes, S.boil, m.toFixed(3), o.ls || 0].join('|');
+    let hit = inked.get(key);
+    if (hit) return hit;
+    const g0 = scratch; g0.save(); g0.font = font; if (o.ls) { try { g0.letterSpacing = o.ls + 'px'; } catch (e) { /* not supported */ } }
+    const w = g0.measureText(str).width; g0.restore();
+    const fs = parseFloat((font.match(/(\d+(?:\.\d+)?)px/) || [0, 22])[1]), pad = fs * .25 + 4;
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.ceil((w + 2 * pad) * m)); c.height = Math.max(1, Math.ceil(fs * 1.7 * m));
+    const g = c.getContext('2d'); g.scale(m, m); g.font = font; g.textBaseline = 'alphabetic';
+    if (o.ls) { try { g.letterSpacing = o.ls + 'px'; } catch (e) { /* not supported */ } }
+    const base = fs * 1.25;
+    g.fillStyle = grain(color, holes); g.fillText(str, pad, base);
+    g.globalAlpha = .42; g.lineWidth = Math.max(.5, fs / 64); g.strokeStyle = grain(color, .5); g.strokeText(str, pad, base);   // bleed
+    g.globalAlpha = 1; g.globalCompositeOperation = 'destination-out'; g.setTransform(1, 0, 0, 1, 0, 0);
+    const pat = g.createPattern(wear(), 'repeat');
+    try { pat.setTransform(new DOMMatrix().translate(S.boil * 53, S.boil * 31).scale(Math.max(.6, m * .8))); } catch (e) { /* older engines */ }
+    g.fillStyle = pat; g.fillRect(0, 0, c.width, c.height);
+    hit = { c, x: -pad, y: -base, w: w + 2 * pad, h: fs * 1.7, tw: w };
+    if (inked.size > 800) inked.delete(inked.keys().next().value);
+    inked.set(key, hit);
+    return hit;
+  }
   function text(ctx, s, x, y, o = {}) {
-    ctx.save();
-    ctx.font = o.font || `22px ${FONT.type}`; ctx.textAlign = o.align || 'left'; ctx.textBaseline = 'alphabetic';
-    ctx.fillStyle = grain(o.color || C.inkD, o.holes ?? .18); ctx.globalAlpha = o.alpha ?? 1;
-    if (o.ls) { try { ctx.letterSpacing = o.ls + 'px'; } catch (e) { /* not supported */ } }
     const str = o.chars != null ? Array.from(s).slice(0, Math.max(0, Math.floor(o.chars))).join('') : s;
-    ctx.fillText(str, x, y);
-    if (o.double) { ctx.globalAlpha *= .35; ctx.fillText(str, x + .7, y + .4); }   // a second strike, slightly off
+    if (!str) return;
+    const font = o.font || `22px ${FONT.type}`;
+    const ink = o.ink ?? (font.includes('Special Elite') && S.inkText !== false);
+    ctx.save();
+    ctx.font = font; ctx.textAlign = o.align || 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.globalAlpha = (o.alpha ?? 1) * S.reveal;
+    if (o.ls) { try { ctx.letterSpacing = o.ls + 'px'; } catch (e) { /* not supported */ } }
+    if (ink) {
+      const T = ctx.getTransform(), m = Math.hypot(T.a, T.b) || 1, im = inkImage(ctx, str, Object.assign({}, o, { font }), m);
+      const full = o.chars != null ? ctx.measureText(s).width : im.tw;
+      const x0 = o.align === 'center' ? x - full / 2 : o.align === 'right' ? x - full : x;
+      ctx.drawImage(im.c, x0 + im.x, y + im.y, im.w, im.h);
+      if (o.double) { ctx.globalAlpha *= .35; ctx.drawImage(im.c, x0 + im.x + .7, y + im.y + .4, im.w, im.h); }
+    } else {
+      ctx.fillStyle = grain(o.color || C.inkD, o.holes ?? .18);
+      if (o.chars != null && o.align && o.align !== 'left') {      // typing: keep the line where the whole line sits
+        const full = ctx.measureText(s).width; ctx.textAlign = 'left';
+        x = o.align === 'center' ? x - full / 2 : x - full;
+      }
+      ctx.fillText(str, x, y);
+      if (o.double) { ctx.globalAlpha *= .35; ctx.fillText(str, x + .7, y + .4); }   // a second strike, slightly off
+    }
     ctx.restore();
   }
   const GUARD = /(\[[^\]]*\]?)/;
@@ -274,14 +368,14 @@
   function words(ctx, s, x, y, o = {}) {
     const size = o.size || 19, lh = o.lh || size * 1.22;
     ctx.save(); ctx.font = `${o.upright ? '' : 'italic '}${size}px ${o.family || FONT.mono}`; ctx.textBaseline = 'alphabetic';
-    let used = 0; const total = o.chars ?? 1e9;
+    let used = 0; const total = o.chars ?? 1e9, A = (o.alpha ?? ctx.globalAlpha) * S.reveal;
     s.split('\n').forEach((ln, li) => {
       const parts = ln.split(GUARD).filter(Boolean), wTot = ctx.measureText(ln).width;
       let cx = o.align === 'right' ? x - wTot : o.align === 'center' ? x - wTot / 2 : x;
       for (const p of parts) {
         const chars = Array.from(p), guard = p[0] === '[', vis = Math.max(0, Math.min(chars.length, total - used));
         used += chars.length;
-        if (vis > 0) { ctx.fillStyle = grain(guard ? C.red : (o.color || C.inkD), .15); ctx.globalAlpha = o.alpha ?? 1; ctx.fillText(chars.slice(0, vis).join(''), cx, y + li * lh); }
+        if (vis > 0) { ctx.fillStyle = grain(guard ? (o.guardColor || C.guard) : (o.color || C.inkD), .15); ctx.globalAlpha = A; ctx.fillText(chars.slice(0, vis).join(''), cx, y + li * lh); }
         cx += ctx.measureText(p).width;
       }
     });
@@ -296,28 +390,46 @@
   const charCount = s => Array.from(s.replace(/\n/g, '')).length;
 
   /* ---------- paper ---------- */
-  function paper(ctx, w, h, k = 0) {
+  // the sheet under everything: cream (the reference), kraft, a squared notebook, dark card, or newsprint
+  function paper(ctx, w, h, k = 0, kind = S.paperKind) {
     ctx.fillStyle = C.paper; ctx.fillRect(0, 0, w, h);
-    const n = document.createElement('canvas'); n.width = n.height = 200;
+    const dark = S.dark, n = document.createElement('canvas'); n.width = n.height = 200;
     const g = n.getContext('2d'), r = prng(7);
     for (let i = 0; i < 9000; i++) {
-      g.fillStyle = r() < .5 ? `rgba(120,100,70,${r() * .07})` : `rgba(255,255,255,${r() * .35})`;
+      g.fillStyle = r() < .5 ? (dark ? `rgba(0,0,0,${r() * .16})` : `rgba(120,100,70,${r() * (kind === 'kraft' ? .14 : .07)})`)
+        : (dark ? `rgba(255,255,255,${r() * .05})` : `rgba(255,255,255,${r() * (kind === 'kraft' ? .18 : .35)})`);
       g.fillRect(r() * 200, r() * 200, r() * 2 + .5, r() * 2 + .5);
     }
     ctx.fillStyle = ctx.createPattern(n, 'repeat'); ctx.fillRect(0, 0, w, h);
     const r2 = prng(31 + k);
-    ctx.save(); ctx.globalAlpha = .05; ctx.strokeStyle = '#8a7a5a'; ctx.lineWidth = .6;
-    for (let i = 0, m = 260 * w * h / 1e6; i < m; i++) {        // fibres
+    ctx.save(); ctx.globalAlpha = kind === 'kraft' ? .12 : dark ? .08 : .05;
+    ctx.strokeStyle = kind === 'kraft' ? '#5a3c1c' : dark ? '#c8cff5' : '#8a7a5a'; ctx.lineWidth = .6;
+    for (let i = 0, m = (kind === 'kraft' ? 520 : 260) * w * h / 1e6; i < m; i++) {        // fibres
       const x = r2() * w, y = r2() * h, a = r2() * TAU, L = r2() * 14 + 3;
       ctx.beginPath(); ctx.moveTo(x, y);
       ctx.quadraticCurveTo(x + Math.cos(a + 1) * L * .5, y + Math.sin(a + 1) * L * .5, x + Math.cos(a) * L, y + Math.sin(a) * L);
       ctx.stroke();
     }
     ctx.restore();
+    if (kind === 'grid') {                                    // a squared notebook: faint blue rules, one red margin
+      ctx.save(); ctx.lineWidth = .8;
+      for (let x = 25; x < w; x += 25) { ctx.strokeStyle = 'rgba(70,110,200,.13)'; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+      for (let y = 25; y < h; y += 25) { ctx.strokeStyle = 'rgba(70,110,200,.13)'; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+      ctx.strokeStyle = 'rgba(216,27,74,.22)'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(34, 0); ctx.lineTo(34, h); ctx.stroke();
+      ctx.restore();
+    } else if (kind === 'news') {                             // newsprint: grey ground, faint columns of type
+      ctx.save(); ctx.fillStyle = 'rgba(90,90,90,.06)'; const r3 = prng(97 + k);
+      for (let col = 0; col < 4; col++) for (let y = 30; y < h; y += 9) { const L = (w / 4 - 30) * (.6 + r3() * .4); ctx.fillRect(col * w / 4 + 15, y, L, 3); }
+      ctx.restore();
+    }
+    // light falls unevenly across a sheet: a soft, wide warm centre and slightly darker corners
+    const vg = ctx.createRadialGradient(w * .48, h * .42, Math.min(w, h) * .2, w * .5, h * .5, Math.hypot(w, h) * .62);
+    vg.addColorStop(0, dark ? 'rgba(255,255,255,.03)' : 'rgba(255,250,235,.10)'); vg.addColorStop(1, dark ? 'rgba(0,0,0,.22)' : 'rgba(110,80,40,.07)');
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, w, h);
   }
 
   window.SCV = Object.assign(window.SCV || {}, {
-    TAU, PI, C, FONT, S, seed, setBoil, rnd, pick, clamp, lerp, ease, easeInOut, backOut, prng, fnv,
+    TAU, PI, C, FONT, S, TIER, seed, setBoil, rnd, toward, atDepth, revealing, within, mixCache, pick, clamp, lerp, ease, easeInOut, backOut, prng, fnv,
     grain, resample, wobble, ell, rect, bez, qbez, smooth, rounded, capsule, bbox, path2d, move, turn, flipX, lengthOf, along,
     line, hatch, radial, shape, dot, blob, scribble, text, words, measureWords, charCount, paper,
   });

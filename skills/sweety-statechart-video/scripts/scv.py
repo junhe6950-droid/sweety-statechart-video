@@ -64,7 +64,7 @@ def frame_size(spec):
     if r >= 1:
         return 1080, round(1080 * r / 2) * 2
     return round(1080 / r / 2) * 2, 1080
-ENGINE_FILES = ['ink.js', 'chart.js', 'layout.js', 'people.js', 'props.js', 'film.js', 'player.js', 'main.js']
+ENGINE_FILES = ['ink.js', 'theme.js', 'chart.js', 'layout.js', 'people.js', 'props.js', 'motion.js', 'film.js', 'player.js', 'main.js']
 ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
 CAPTION_MAX = 24
 FPS = 30
@@ -297,7 +297,10 @@ def font_css():
     def url(name):
         return (FONTS / name).as_uri()
     hand = f"url('{url('LXGWWenKai-500.woff')}') format('woff')"
-    song = "local('STSongti-SC-Bold'), local('Songti SC Bold'), local('Noto Serif CJK SC Bold'), local('Source Han Serif SC Bold'), local('SimSun')"
+    # bundled CJK faces (GB2312 subsets, OFL); a character outside the subset falls back to the system's serif
+    song = f"url('{url('NotoSerifSC-Bold-gb.woff2')}') format('woff2'), local('Noto Serif CJK SC Bold'), local('STSongti-SC-Bold'), local('Songti SC Bold')"
+    fang = f"url('{url('ZhuqueFangsong-gb.woff2')}') format('woff2')"
+    marker = f"url('{url('LXGWMarkerGothic-gb.woff2')}') format('woff2')"
     return f"""
 @font-face {{ font-family: 'Special Elite'; src: url('{url('SpecialElite-Regular.ttf')}'); }}
 @font-face {{ font-family: 'Courier Prime'; src: url('{url('CourierPrime-Regular.ttf')}'); font-style: normal; font-weight: 400; }}
@@ -306,6 +309,8 @@ def font_css():
 @font-face {{ font-family: 'SCV Hand'; src: {hand}; font-style: normal; }}
 @font-face {{ font-family: 'SCV Hand'; src: {hand}; font-style: italic; }}
 @font-face {{ font-family: 'SCV Type'; src: {song}; }}
+@font-face {{ font-family: 'SCV Fangsong'; src: {fang}; }}
+@font-face {{ font-family: 'SCV Marker'; src: {marker}; }}
 """
 
 
@@ -491,12 +496,15 @@ def plan(job, spec):
     W, H = frame_size(spec)
     timing = {'W': W, 'H': H, 'fps': int(spec.get('fps', FPS)), 'speed': sp, 'lead': LEAD, 'duration': total, 'total': total, 'voice': v, 'target': [lo, hi], 'steps': steps}
     (job / 'work').mkdir(exist_ok=True)
-    (job / 'work/timing.json').write_text(json.dumps(timing, ensure_ascii=False, indent=1))
     sfx = [{'kind': 'pop', 'at': round(s['t0'] + .9 / sp, 3), 'gain_db': -6} for s in steps] if spec.get('sfx') else []
     music = spec.get('music') or None
     if isinstance(music, str):
         music = {'mood': music}
-    (job / 'work/timeline.json').write_text(json.dumps({'duration': total, 'lines': lines, 'music': music, 'sfx': sfx}, ensure_ascii=False, indent=1))
+    timeline = {'duration': total, 'lines': lines, 'music': music, 'sfx': sfx}
+    timing, timeline = stage(spec, timing, timeline)
+    total = timing['total']
+    (job / 'work/timing.json').write_text(json.dumps(timing, ensure_ascii=False, indent=1))
+    (job / 'work/timeline.json').write_text(json.dumps(timeline, ensure_ascii=False, indent=1))
     print(f'plan: {len(steps)} steps, {total:.1f} s at speed {sp:g}' + (f', {len(lines)} narrated lines' if lines else ', silent')
           + (f', +{stretch:.2f} s hold per step toward the target' if stretch else ''))
     if total < lo - 1 or total > hi + 1:
@@ -506,7 +514,55 @@ def plan(job, spec):
 
 
 def page_timing(timing):
-    return {'lead': timing['lead'], 'total': timing['total'], 'steps': [{'t0': s['t0'], 'dur': s['dur']} for s in timing['steps']]}
+    """what the page needs from timing.json: step times, and when present the narration's character times, the
+    speaker, the talk envelope, the hook and the outro"""
+    steps = []
+    for s in timing['steps']:
+        st = {'t0': s['t0'], 'dur': s['dur']}
+        for k in ('chars', 'speaker'):
+            if s.get(k) is not None:
+                st[k] = s[k]
+        steps.append(st)
+    out = {'lead': timing['lead'], 'total': timing['total'], 'steps': steps}
+    for k in ('talk', 'hook', 'outro'):
+        if timing.get(k):
+            out[k] = timing[k]
+    return out
+
+
+HOOK_SECONDS, OUTRO_SECONDS = 3.4, 5.5
+
+
+def stage(spec, timing, timeline):
+    """the opening hook (the finished first poster and a question) and the closing overview: shift everything after
+    the hook, add the outro at the end. Applied by plan() just before it writes timing.json and timeline.json."""
+    hook = spec.get('hook')
+    outro = spec.get('outro', 'overview' if len(spec.get('chapters') or []) >= 2 else False)
+    if hook:
+        d = HOOK_SECONDS
+        timing['hook'] = {'dur': d, 'text': hook if isinstance(hook, str) else (spec.get('title') or '')}
+        for s in timing['steps']:
+            s['t0'] = round(s['t0'] + d, 3)
+            s['t1'] = round(s['t1'] + d, 3)
+            if s.get('chars'):
+                s['chars'] = [[c[0], round(c[1] + d, 3), round(c[2] + d, 3)] for c in s['chars']]
+        for line in timeline.get('lines', []):
+            line['at'] = round(line['at'] + d, 3)
+        for e in timeline.get('sfx', []) or []:
+            e['at'] = round(e['at'] + d, 3)
+        for a in timeline.get('ambience', []) or []:
+            a['from'] = round(a['from'] + d, 3)
+            a['to'] = round(a['to'] + d, 3)
+        tk = timing.get('talk')
+        if tk and tk.get('env') is not None:
+            tk['env'] = [0] * round(d * tk.get('fps', 30)) + tk['env']
+        timing['total'] = timing['duration'] = round(timing['total'] + d, 3)
+    if outro:
+        at = round(timing['total'] - .4, 3)
+        timing['outro'] = {'at': at, 'dur': OUTRO_SECONDS}
+        timing['total'] = timing['duration'] = round(at + OUTRO_SECONDS, 3)
+    timeline['duration'] = timing['total']
+    return timing, timeline
 
 
 # ------------------------------------------------------------------ stills, posters
@@ -552,9 +608,8 @@ def posters(job, spec):
             f = out / f'{ci + 1:02d}.png'
             f.write_bytes(b64(pg.evaluate(f'posterPNG({ci})')))
             files.append(f)
+        (job / 'outputs/cover.png').write_bytes(b64(pg.evaluate('coverPNG()')))
         b.close()
-    im = Image.open(files[0]).convert('RGB')
-    im.resize((1080, round(1080 * im.height / im.width)), Image.LANCZOS).save(job / 'outputs/cover.png')
     print('wrote', len(files), 'posters to', out, 'and outputs/cover.png')
     return files
 

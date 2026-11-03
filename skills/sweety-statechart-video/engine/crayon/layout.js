@@ -5,18 +5,20 @@
  * (obstacles, crossings, overlaps, length, bends), words by scoring spots around each arrow.
  * Output geometry is in poster units (1000 wide). */
 (function () {
-  const K = window.SCV, { FONT } = K, TH = 56;
+  const K = window.SCV, { FONT } = K;
+  let TH = 56;                                       // ticket height (60 with the larger upright-frame words)
   const GAP = 84, LANE = 26, END_SIDE = 52;
-  const SIZE = { label: 18.5 };
+  const SIZE = { label: 18.5, card: 23, tag: 12 };
+  function setText(t) { SIZE.label = t.edge; SIZE.card = t.card; SIZE.tag = t.tag; TH = t.card >= 26 ? 60 : 56; }
   let ctx = null;
   const g2d = () => ctx || (ctx = document.createElement('canvas').getContext('2d'));
 
   /* ---------------- text ---------------- */
   function boxWidth(st) {
     const c = g2d();
-    c.font = `23px ${FONT.type}`; const lw = c.measureText(st.label || st.id).width;
-    c.font = `italic 12px ${FONT.mono}`; const tw = c.measureText(st.tag || '').width;
-    return Math.round(Math.min(300, Math.max(st.w || 0, 150, lw + 54, tw + 30)));
+    c.font = `${SIZE.card}px ${FONT.type}`; const lw = c.measureText(st.label || st.id).width;
+    c.font = `italic ${SIZE.tag}px ${FONT.mono}`; const tw = c.measureText(st.tag || '').width;
+    return Math.round(Math.min(320, Math.max(st.w || 0, 150 + (SIZE.card - 23) * 4, lw + 54, tw + 30)));
   }
   const cjk = s => /[　-鿿＀-￯]/.test(s);
   function wrapLine(s, max) {                        // break a long line at a natural place
@@ -362,7 +364,7 @@
   function chapter(ch, W, H, header) {
     const items = {};
     const GAPV = Math.round(GAP + Math.max(0, H - 1000) * .06);
-    const box = (id, st) => ({ id, kind: 'box', label: st.label || id, tag: st.tag, pin: st.pin, w: boxWidth(st), h: TH, at: st.at, size: st.size });
+    const box = (id, st) => ({ id, kind: 'box', label: st.label || id, tag: st.tag, pin: st.pin, w: boxWidth(st), h: TH, at: st.at, size: st.size, skind: st.kind, mood: st.mood });
     for (const [id, st] of Object.entries(ch.states)) items[id] = box(id, st);
     for (const e of ch.edges) if (e.to === 'end' || /^end\d*$/.test(e.to)) items[e.to] = items[e.to] || { id: e.to, kind: 'end', w: 30, h: 30 };
     const container = ch.regions ? ch.regions.id : null;
@@ -504,7 +506,7 @@
       edges.forEach(e => { penalty += Math.max(0, (e.penalty || 0) - 2500); if (e.lab) penalty += e.lab.penalty >= 2500 ? e.lab.penalty : 0; });
       const boxes = {}, dots = {};
       for (const n of Object.values(N)) {
-        if (n.kind === 'box') boxes[n.id] = { id: n.id, x: n.x, y: n.y, w: n.w, label: n.label, tag: n.tag, pin: n.pin, size: n.size, lane: n.lane };
+        if (n.kind === 'box') boxes[n.id] = { id: n.id, x: n.x, y: n.y, w: n.w, h: TH, label: n.label, tag: n.tag, pin: n.pin, size: n.size, lane: n.lane, kind: n.skind, mood: n.mood };
         else if (n.kind === 'end' || n.kind === 'start') dots[n.id] = { id: n.id, type: n.kind, x: n.x, y: n.y };
       }
       const outEdges = edges.concat(inner, extra).map(e => ({ id: e.id, from: e.from, to: e.to, kind: e.kind, text: e.text || '', pts: e.pts, route: K.rounded(e.pts, 16), lab: e.lab || null, noHead: !!e.noHead }));
@@ -516,7 +518,10 @@
   // the arrow leaving through the bottom of one poster and the one entering the next, lined up into one line
   function linkChapters(L, next, H, exit) {
     const from = L.boxes[exit.from];
-    const x2 = next ? next.entryX : from.x;
+    let x2 = next ? next.entryX : from.x;
+    // the seam: where the exit leaves this poster and the entry comes into the next; never down through its header
+    const hd = next && next.header, xEntry = x2;
+    if (hd && x2 > hd.x0 - 14 && x2 < hd.x1 + 14) x2 = Math.min(966, hd.x1 + 30);
     const a = [from.x, from.y + TH / 2 + 6];
     const yj = H - 42;
     const pts = Math.abs(a[0] - x2) < 3 ? [a, [a[0], H + 1]] : [a, [a[0], yj], [x2, yj], [x2, H + 1]];
@@ -528,8 +533,12 @@
       const s = next.boxes[next.entryNode];
       const top = s ? s.y - TH / 2 - 11 : (next.containers[0] ? next.containers[0].y0 - 2 : 80);
       const xin = x2;
-      const pts2 = [[xin, -1], [xin, top]];
-      next.edges.push({ id: 'entry>' + next.entryNode, from: 'entry', to: next.entryNode, kind: 'entry', text: '', pts: pts2, route: pts2, noHead: false, lab: null });
+      let pts2 = [[xin, -1], [xin, top]];
+      if (xin !== xEntry) {                               // come down beside the header, then across to the card
+        const yk = Math.max(hd.y1 + 18, Math.min(top - 26, hd.y1 + 40));
+        pts2 = [[xin, -1], [xin, yk], [xEntry, yk], [xEntry, top]];
+      }
+      next.edges.push({ id: 'entry>' + next.entryNode, from: 'entry', to: next.entryNode, kind: 'entry', text: '', pts: pts2, route: K.rounded(pts2, 16), noHead: false, lab: null });
     }
     return e;
   }
@@ -565,5 +574,5 @@
     return found;
   }
 
-  K.layout = { chapter, linkChapters, freeAreas, edgeText, boxWidth, segs, R, grow, hit };
+  K.layout = { chapter, linkChapters, freeAreas, edgeText, boxWidth, segs, R, grow, hit, setText, size: SIZE, th: () => TH };
 })();
