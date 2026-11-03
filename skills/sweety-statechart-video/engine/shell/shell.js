@@ -48,7 +48,7 @@
     const ui = layout(P, null), steps = P.steps, total = P.total, speed = film.speed || 2;
     const report = window.layoutReport ? window.layoutReport() : null;
     const nativeSpot = !!(K.Player && K.Player.features && K.Player.features.spotlight);
-    let t = 0, playing = false, rate = 1, last = performance.now(), dirty = true, stepMode = false, scopeOn = false, glide = null, cur = -2;
+    let t = 0, playing = false, rate = 1, last = performance.now(), dirty = true, stepMode = false, scopeOn = false, glide = null, cur = -2, lastSync = 0, lastAudio = -1;
 
     /* controls */
     const bar = el('div', 'scv-bar'), btn = (label, title, fn) => { const b = el('button', null, label); b.type = 'button'; b.title = title; b.setAttribute('aria-label', title); b.onclick = fn; bar.appendChild(b); return b; };
@@ -211,7 +211,12 @@
         dirty = true;
       } else if (playing) {
         t += dt * rate;
-        if (audio && !audio.paused && !audio.ended && Math.abs(audio.currentTime - t) > .12 && audio.currentTime < audio.duration - .05) t = audio.currentTime;
+        if (audio && !audio.paused && !audio.ended) {   // the clock leads; it follows the sound while they agree,
+          const d = audio.currentTime - t, moving = audio.currentTime !== lastAudio;   // and puts a stalled or
+          lastAudio = audio.currentTime;                                                // drifting sound back in line
+          if (Math.abs(d) < .25) { if (moving) t += d * .05; }
+          else if (now - lastSync > 1000) { lastSync = now; try { audio.currentTime = t; } catch (e) { /* not seekable yet */ } }
+        }
         if (t >= total) { t = total; pause(); }
         dirty = true;
       }

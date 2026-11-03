@@ -5,6 +5,7 @@
   color-scheme: light;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }        /* the render page says canvas{display:block} */
 html, body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.5 var(--mono); }
 .scv-shell { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; padding: 14px 16px; min-height: 100vh; align-items: start; }
 .scv-stage { position: sticky; top: 14px; display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; }
