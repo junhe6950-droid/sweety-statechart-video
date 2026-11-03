@@ -229,6 +229,14 @@
     } else if (e.style === 'async') {
       e._wavy = e._wavy || wavy(e.route);
       K.line(ctx, e._wavy, { w: o.w || 2.1, color, progress: prog });
+    } else if (o.cord) {                    // a gold cord, couched down with small stitches across it
+      K.line(ctx, e.route, { w: 3.6, color: C.ochre, progress: prog, taper: false });
+      K.line(ctx, e.route, { w: 1.6, color: C.yolk, progress: prog, passes: 1, taper: false, amp: .4 });
+      const P = e.route, L = lengthOf(P);
+      for (let d = 8; d < L * prog; d += 14) {
+        const a = K.along(P, d / L), b2 = K.along(P, Math.min(1, (d + 1) / L)), ang = Math.atan2(b2[1] - a[1], b2[0] - a[0]) + Math.PI / 2;
+        K.line(ctx, [[a[0] - Math.cos(ang) * 4, a[1] - Math.sin(ang) * 4], [a[0] + Math.cos(ang) * 4, a[1] + Math.sin(ang) * 4]], { w: 1, color: C.brown, passes: 1, taper: false, amp: .2 });
+      }
     } else K.line(ctx, e.route, { w: o.w || 2.3, color, progress: prog });
     if (prog >= .999 && !e.noHead) { const P = e.route, n = P.length; arrowHead(ctx, P[n - 1], P[n - 2], e.id, color, o.head); }
     if (e.style === 'timer' && prog >= .5 && e.lab) clock(ctx, e.lab.align === 'right' ? e.lab.x + 14 : e.lab.x - 14, e.lab.y - 6, 9, 0);

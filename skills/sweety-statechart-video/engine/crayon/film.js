@@ -314,7 +314,7 @@
       const past = fade && !hot.has(e.id), thread = ch.arrows === 'thread';
       const showBug = ch.bug && ch.bug.edges.has(e.id) && traced;
       if (showBug) K.chart.wash(g, e, seen ? 1 : ep);
-      K.chart.arrow(g, e, seen ? 1 : ep, Object.assign(thread ? { color: C.redD, w: 1.8, stop: 7, head: .8 } : ch.arrows === 'pencil' ? { stop: 6 } : {}, past ? { color: C.past, alpha: .7 } : {}));
+      K.chart.arrow(g, e, seen ? 1 : ep, Object.assign(thread ? { color: C.redD, w: 1.8, stop: 7, head: .8 } : ch.arrows === 'pencil' ? { stop: 6 } : ch.arrows === 'cord' ? { cord: true, color: C.ochre, stop: 8, head: 1.1 } : {}, past ? { color: C.past, alpha: .7 } : {}));
       const fixHere = fix && fixed && e.id === (fix.edge || '') ? fix.if || fix.when || '' : null;
       const lane = e.waitsLane && ch.regions ? ch.regions.lanes.find(l => l.id === e.waitsLane) : null;
       const STRONG = { sky: 'blue', rose: 'pink', mint: 'teal', straw: 'ochre', lilac: 'violet' };   // a region's tint -> its ink

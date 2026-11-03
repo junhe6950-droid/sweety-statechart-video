@@ -612,6 +612,7 @@ def posters(job, spec):
         for ci in range(len(spec['chapters'])):
             f = out / f'{ci + 1:02d}.png'
             f.write_bytes(b64(pg.evaluate(f'posterPNG({ci})')))
+            (out / f'{ci + 1:02d}-layout.png').write_bytes(b64(pg.evaluate(f'posterPNG({ci}, {{overlay: true}})')))
             files.append(f)
         (job / 'outputs/cover.png').write_bytes(b64(pg.evaluate('coverPNG()')))
         b.close()

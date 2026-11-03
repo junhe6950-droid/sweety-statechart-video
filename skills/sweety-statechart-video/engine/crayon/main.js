@@ -18,7 +18,7 @@
       window.__player = player;
       window.renderAt = T => player.renderAt(T);
       window.frameJPEG = (T, q = .93) => { player.renderAt(T); return cv.toDataURL('image/jpeg', q); };
-      window.posterPNG = ci => poster(film, ci, false);
+      window.posterPNG = (ci, o = {}) => poster(film, ci, false, o.overlay);
       window.timeline = () => ({ total: player.total, steps: player.steps.map(s => ({ ci: s.ci, si: s.si, t0: s.t0, dur: s.dur, note: s.s.note })), camera: player.camSegs });
       window.layoutReport = () => report(film);
     }
@@ -27,11 +27,22 @@
     window.ENGINE_ERROR = (e && e.stack) || String(e);
   }
 
-  function poster(film, ci, grid) {
+  function poster(film, ci, grid, overlay) {
     const ch = film.chapters[ci], k = 2;
     const c = document.createElement('canvas'); c.width = film.W * k; c.height = film.H * k;
     const g = c.getContext('2d'); g.scale(k, k);
     K.film.drawPoster(g, film, ch, 0);
+    if (overlay) {                                   // the layout's own shapes in blue over the finished poster
+      const L = ch.L, blue = 'rgba(30,90,230,.85)';
+      g.save(); g.lineWidth = 1.6; g.strokeStyle = blue; g.fillStyle = 'rgba(30,90,230,.06)';
+      for (const b of Object.values(L.boxes)) { const h = b.h || 56; g.fillRect(b.x - b.w / 2, b.y - h / 2, b.w, h); g.strokeRect(b.x - b.w / 2, b.y - h / 2, b.w, h); }
+      for (const d of Object.values(L.dots)) { g.beginPath(); g.arc(d.x, d.y, 14, 0, Math.PI * 2); g.stroke(); }
+      for (const e of L.edges) { g.beginPath(); e.pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke(); if (e.lab && e.lab.box) { const q = e.lab.box; g.setLineDash([4, 3]); g.strokeRect(q.x0, q.y0, q.x1 - q.x0, q.y1 - q.y0); g.setLineDash([]); } }
+      for (const k2 of L.containers) { g.strokeRect(k2.x0, k2.y0, k2.x1 - k2.x0, k2.y1 - k2.y0); k2.regions.forEach(r => g.strokeRect(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0)); }
+      if (L.header) { g.setLineDash([2, 4]); g.strokeRect(L.header.x0, L.header.y0, L.header.x1 - L.header.x0, L.header.y1 - L.header.y0); g.setLineDash([]); }
+      if (L.legend) g.strokeRect(L.legend.x0, L.legend.y0, L.legend.x1 - L.legend.x0, L.legend.y1 - L.legend.y0);
+      g.restore();
+    }
     if (grid) {
       g.save(); g.lineWidth = 1; g.font = '13px monospace';
       for (let x = 0; x <= film.W; x += 50) { g.strokeStyle = x % 100 ? 'rgba(255,0,80,.12)' : 'rgba(255,0,80,.35)'; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, film.H); g.stroke(); if (x % 100 === 0) { g.fillStyle = '#e8175d'; g.fillText(x, x + 2, 12); } }

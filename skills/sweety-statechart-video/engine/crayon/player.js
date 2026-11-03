@@ -218,6 +218,8 @@
       g.setTransform(1, 0, 0, 1, 0, 0);
       const mood = outroOn ? null : this.moodAt(T, cur);
       if (mood) this.grade(g, mood, T);
+      if (!outroOn && cur >= 0 && (this.opts.spotlight || A.s.spotlight)) this.spotlight(g, A, t, view, m);
+      if (!outroOn && cur >= 0) this.inset(g, A, t, T, sceneT, boil, talk, speaker);
       if (this.opts.chip !== false) this.chip(g);
       if (this.aiLabel && T < 4.2) this.label(g, this.aiLabel, K.clamp(Math.min((T - .2) / .3, (4.2 - T) / .5)));
       if (outroOn) this.endCard(g, T);
@@ -249,6 +251,46 @@
       if (this.aiLabel) this.label(g, this.aiLabel, K.clamp(Math.min((T - .2) / .3, 1)));
       this.captionBar(g, -1, T, false, this.hook.text);
       return { step: -1, scroll: 0, zoom: z };
+    }
+    // the spotlight: everything but the active cards dims, as when you step through the chart by hand
+    spotlight(g, A, t, view, m) {
+      const ch = this.f.chapters[A.ci], L = ch.L, ids = A.s.on.length ? A.s.on : A.s.pass;
+      if (!ids.length) return;
+      const W = this.cv.width, H = this.cv.height - this.bar, a = K.clamp((t - .9) / .5) * .42;
+      if (a <= 0) return;
+      const c = this.spot || (this.spot = document.createElement('canvas'));
+      c.width = W; c.height = H;
+      const x = c.getContext('2d');
+      x.fillStyle = `rgba(28,22,16,${a})`; x.fillRect(0, 0, W, H);
+      x.globalCompositeOperation = 'destination-out';
+      for (const id of ids) {
+        const b = L.boxes[id]; if (!b) continue;
+        const cx = (b.x - view.left) * m, cy = (A.ci * this.PH + b.y - view.top) * m, rx = (b.w / 2 + 46) * m, ry = ((b.h || 56) / 2 + 40) * m;
+        const rg = x.createRadialGradient(cx, cy, 0, cx, cy, 1);
+        rg.addColorStop(0, 'rgba(0,0,0,1)'); rg.addColorStop(.72, 'rgba(0,0,0,1)'); rg.addColorStop(1, 'rgba(0,0,0,0)');
+        x.save(); x.translate(cx, cy); x.scale(rx, ry); x.translate(-cx, -cy); x.fillStyle = rg; x.beginPath(); x.arc(cx, cy, 1, 0, Math.PI * 2); x.fill(); x.restore();
+      }
+      g.drawImage(c, 0, 0);
+    }
+    // the microscope view: a round lens in the corner showing, close up, the spot an active state names with
+    // "inset": [x, y, r] (poster units); it opens when the state does and closes when it ends
+    inset(g, A, t, T, sceneT, boil, talk, speaker) {
+      const ch = this.f.chapters[A.ci], id = A.s.on.find(x => ch.states[x] && ch.states[x].inset);
+      if (!id) return;
+      const [px, py, pr] = ch.states[id].inset, open = K.backOut(K.clamp((t - 1.1) / .5));
+      if (open <= 0) return;
+      const k = this.ui, R = 150 * k * open, cx = this.cv.width - R - 26 * k, cy = this.cv.height - this.bar - R - 26 * k;
+      const z = R / (pr || 80);
+      g.save();
+      g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.clip();
+      g.fillStyle = C.paper; g.fillRect(cx - R, cy - R, 2 * R, 2 * R);
+      g.setTransform(z, 0, 0, z, cx - px * z, cy - py * z);
+      g.drawImage(this.staticLayer(A.ci, boil), 0, 0, this.f.W, this.PH);
+      this.live(g, ch, A.si, t, T, sceneT, boil, A.si, talk, speaker);
+      g.restore();
+      g.save(); g.lineWidth = 7 * k; g.strokeStyle = C.ink; g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.stroke();
+      g.lineWidth = 2 * k; g.strokeStyle = C.card; g.beginPath(); g.arc(cx, cy, R - 6 * k, 0, Math.PI * 2); g.stroke();
+      g.restore();
     }
     // the active state's mood over the whole page: rain cools and greys, night darkens blue, alert reddens the
     // edges with a pulse, fixed / warm warm it up

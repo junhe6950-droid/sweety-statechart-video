@@ -418,6 +418,11 @@
       for (let y = 25; y < h; y += 25) { ctx.strokeStyle = 'rgba(70,110,200,.13)'; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
       ctx.strokeStyle = 'rgba(216,27,74,.22)'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(34, 0); ctx.lineTo(34, h); ctx.stroke();
       ctx.restore();
+    } else if (kind === 'linen') {                            // linen: a fine weave, the cloth an embroidery is stitched into
+      ctx.save(); ctx.lineWidth = .7; const r3 = prng(53 + k);
+      for (let x = 0; x < w; x += 3.2) { ctx.strokeStyle = `rgba(120,100,70,${.05 + r3() * .06})`; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + r3() * 2 - 1, h); ctx.stroke(); }
+      for (let y = 0; y < h; y += 3.2) { ctx.strokeStyle = `rgba(255,255,255,${.08 + r3() * .1})`; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y + r3() * 2 - 1); ctx.stroke(); }
+      ctx.restore();
     } else if (kind === 'news') {                             // newsprint: grey ground, faint columns of type
       ctx.save(); ctx.fillStyle = 'rgba(90,90,90,.06)'; const r3 = prng(97 + k);
       for (let col = 0; col < 4; col++) for (let y = 30; y < h; y += 9) { const L = (w / 4 - 30) * (.6 + r3() * .4); ctx.fillRect(col * w / 4 + 15, y, L, 3); }

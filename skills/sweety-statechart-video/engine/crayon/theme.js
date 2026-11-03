@@ -66,6 +66,8 @@
         white: '#fffdf8', card: '#fdfaf2', bg: '#e8e1d3',
       },
     },
+    // felt patches stitched to linen with gold cord (after Kevin Ngo's "Catch" finale)
+    linen: { name: '亚麻刺绣', paper: 'linen', blend: 'multiply', type: 'fangsong', colors: { paper: '#efe6d4', card: '#fbf5e6', bg: '#d9cdb5' } },
     riso: {
       name: '孔版', paper: 'cream', blend: 'multiply', misreg: 3.2,
       colors: {                                            // three inks (riso blue, fluorescent pink, yellow) and their overprints
