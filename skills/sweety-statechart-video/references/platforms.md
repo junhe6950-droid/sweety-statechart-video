@@ -26,6 +26,8 @@ npx skills add threerocks/sweety-statechart-video --skill sweety-statechart-vide
   - 每一步都可以单独重跑，配音结果有缓存，不会白做。
 - **Claude Code**：放进 `~/.claude/skills/` 即可。渲染会启动本机 Chrome，第一次运行时按提示允许。
 - **Codex**：放进 `~/.codex/skills/`，`agents/openai.yaml` 提供显示名和默认提示。渲染要启动浏览器，沙箱拦截时按提示放行这条命令。
+  - 命令行里提示 “model is not supported when using Codex with a ChatGPT account”：说明配置里的默认模型只有桌面版能用。命令行加 `-m` 换一个可用的模型，例如 `codex exec -m gpt-5.6-sol …`；
+  - 新版 `codex exec` 没有 `--full-auto`，改用 `-s workspace-write`。
 - **Grok Build**：`~/.grok/skills/` 或 `~/.claude/skills/` 都能识别。无人值守地跑（`grok -p`）时，要给 Shell 命令放行。
 - **Grok Bot、Muse**：按各自平台导入 Skill 文件夹。
 - **WorkBuddy**：计划支持。
