@@ -239,9 +239,15 @@
       g.setTransform(1, 0, 0, 1, 0, 0);
       g.fillStyle = C.bg; g.fillRect(0, 0, this.cv.width, this.cv.height);
       const z = .92 + .06 * K.ease(K.clamp(T / d)), m = this.k * z, ox = (this.cv.width - f.W * m) / 2;
-      g.setTransform(m, 0, 0, m, ox, 0);
-      K.film.drawPoster(g, f, ch, boil);
-      g.setTransform(1, 0, 0, 1, 0, 0);
+      const key = 'hook:' + boil;                      // the finished first poster, drawn once per boil frame
+      if (!this.cache.has(key)) {
+        const c = document.createElement('canvas'), s = this.k;
+        c.width = Math.round(f.W * s); c.height = Math.round(this.PH * s);
+        const cg = c.getContext('2d'); cg.scale(s, s);
+        K.film.drawPoster(cg, f, ch, boil);
+        this.cache.set(key, c);
+      }
+      g.drawImage(this.cache.get(key), ox, 0, f.W * m, this.PH * m);
       const wipe = K.clamp((T - (d - .55)) / .5);       // paper slides up over it: rewind to the start
       if (wipe > 0) {
         g.save(); g.setTransform(this.k, 0, 0, this.k, 0, this.cv.height * (1 - K.ease(wipe)));
