@@ -365,6 +365,19 @@
       if (this.aiLabel) this.label(g, this.aiLabel, a);
     }
     round(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+    // where each region is now, on one small line above the strip ("the booster · the ship · the tower" in Catch)
+    laneStatus(g, cur) {
+      const { ci, s } = this.steps[cur], ch = this.f.chapters[ci];
+      if (!ch.regions || ch.regions.lanes.length < 2) return;
+      const parts = ch.regions.lanes.map(l => { const id = s.on.find(x => l.states.includes(x)); return id ? `${l.title || l.id} · ${(ch.states[id] && ch.states[id].label) || id}` : null; }).filter(Boolean);
+      if (parts.length < 2) return;
+      const k = this.ui, W = this.cv.width, H = this.cv.height, y = H - this.bar - 20 * k, text = parts.join('      ');
+      g.save(); g.font = `${Math.round(22 * k)}px ${FONT.mono}`;
+      const w = g.measureText(text).width + 28 * k;
+      g.fillStyle = K.S.dark ? 'rgba(20,26,51,.85)' : 'rgba(251,247,236,.9)'; this.round(g, (W - w) / 2, y - 18 * k, w, 36 * k, 18 * k); g.fill();
+      g.fillStyle = C.cardInk; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, W / 2, y + 1);
+      g.restore();
+    }
     // how much of a step's note the narration has read at T: from the voice's character times, else everything
     spokenChars(st, T) {
       const ch = st.chars;
@@ -411,6 +424,7 @@
         g.fillText(count, W - 22 * k, y);
       }
       g.restore();
+      if (cur >= 0 && !outro && !hookText && this.opts.lanes !== false) this.laneStatus(g, cur);
     }
   }
   K.Player = Player;
