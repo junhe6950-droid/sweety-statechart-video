@@ -1,0 +1,38 @@
+{
+ "about": "The four voices of sweety-statechart-video. Each is designed by VoxCPM2 from the text description alone (Voice Design: who + texture + use), with no real person, creator, platform voice or cloud TTS output as reference. scripts/design_voice.py voices the reference line with several seeds, keeps the cleanest passing take as the reference clip, then clones it for the same-text preview.",
+ "reference_text": "这是一张手绘的状态图。小圆点沿着箭头往前走，走到哪一格，事情就变成哪个样子。我们一步一步，把它看清楚。",
+ "preview_text": "付了钱，商家叮的一声接了单。厨房开了火，面已经下锅了。",
+ "design": {"cfg_value": 2.0, "timesteps": 16, "seeds": [101, 202, 303, 404]},
+ "narration": {"mode": "combined", "cfg_value": 2.0, "timesteps": 10, "seed": 2026},
+ "default": "crayon-sister",
+ "voices": [
+  {
+   "id": "crayon-sister",
+   "name": "蜡笔姐姐",
+   "description": "明亮温暖、带着笑意，像给朋友讲一张手绘图；轻松的生活知识。默认声音。",
+   "design_prompt": "二十五岁左右的年轻女性，声音明亮温暖，带着笑意，语气轻快亲切，吐字清楚，像在给朋友讲一张手绘图，适合轻松的生活知识科普",
+   "pitch": "female"
+  },
+  {
+   "id": "blueprint-guy",
+   "name": "图纸哥",
+   "description": "干净清爽、理性利落，带一点幽默；讲流程、原理和机制。",
+   "design_prompt": "三十岁左右的男性，声音干净清爽，中音明亮，语气理性利落，条理清楚，带一点轻松的幽默感，适合讲流程、原理和机制",
+   "pitch": "male"
+  },
+  {
+   "id": "sunny-girl",
+   "name": "元气少女",
+   "description": "清脆甜亮、元气十足，语调上扬；有趣的小科普和生活故事。",
+   "design_prompt": "十八岁左右的少女，声音清脆甜亮，元气十足，语调活泼上扬，语速稍快，充满好奇心，适合有趣的小科普和生活故事",
+   "pitch": "female"
+  },
+  {
+   "id": "old-master",
+   "name": "老师傅",
+   "description": "温厚略沙哑、慢悠悠带着笑，像老手艺人边干边讲；手艺、老行当和过日子的道理。",
+   "design_prompt": "六十多岁的老年男性，声音温厚，略带沙哑，语速稍慢，带着笑意，朴实亲切，像老手艺人一边干活一边讲，适合讲手艺、老行当和过日子的道理",
+   "pitch": "male"
+  }
+ ]
+}

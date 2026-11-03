@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+"""Smoke test: the takeout example checks clean (and the checker finds its red path), lays out every poster without
+page errors or overlapping words, plays one still per step and renders two seconds of video. Silent (no voice), so it
+needs only Chrome + Playwright. usage: smoke_test.py [--keep]"""
+import json, shutil, subprocess, sys, tempfile
+from pathlib import Path
+
+SKILL = Path(__file__).resolve().parent.parent
+SCV = SKILL / 'scripts/scv.py'
+
+
+def run(*args):
+    r = subprocess.run([sys.executable, str(SCV), *args], capture_output=True, text=True)
+    if r.returncode:
+        print(r.stdout[-3000:], r.stderr[-3000:])
+        raise SystemExit(f'FAIL: scv.py {" ".join(args)}')
+    return r.stdout + r.stderr
+
+
+def main():
+    tmp = Path(tempfile.mkdtemp(prefix='scv-smoke-'))
+    job = tmp / 'takeout'
+    job.mkdir()
+    shutil.copy(SKILL / 'examples/takeout/scenes.js', job / 'scenes.js')
+    spec = json.loads((SKILL / 'examples/takeout/film.json').read_text())
+    spec['voice'] = 'none'
+    (job / 'film.json').write_text(json.dumps(spec, ensure_ascii=False))
+    out = run('check', str(job))
+    chk = json.loads(out[out.index('{'):])
+    assert not chk['errors'], chk['errors']
+    assert 'fresh > warm > cool > soggy > served' in out, out
+    run('layout', str(job))
+    rep = json.loads((job / 'work/layout/report.json').read_text())
+    assert not rep['page_errors'], rep['page_errors']
+    assert len(rep['chapters']) == len(spec['chapters'])
+    run('plan', str(job))
+    run('stills', str(job))
+    steps = len(json.loads((job / 'work/timing.json').read_text())['steps'])
+    n = len(list((job / 'work/stills').glob('t*.jpg')))
+    assert n == steps, (n, steps)
+    run('render', str(job), '--end', '2', '--workers', '2')
+    video = job / 'work/render/video.mp4'
+    assert video.exists() and video.stat().st_size > 10000
+    print(f"PASS: {len(rep['chapters'])} posters, {steps} steps, red path fresh > warm > cool > soggy > served, "
+          f"layout warnings: {len(rep['warnings'])}")
+    for w in rep['warnings']:
+        print(' ', w)
+    if '--keep' in sys.argv:
+        print('kept', job)
+    else:
+        shutil.rmtree(tmp)
+
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,107 @@
+{
+ "title": "一条消息的旅程",
+ "series": "手机里的小事",
+ "language": "zh",
+ "aspect": "3:4",
+ "voice": "blueprint-guy",
+ "chapters": [
+  {
+   "title": "发出去",
+   "sub": "从输入，到已读",
+   "tagline": "typing · sending · read",
+   "states": {
+    "typing": {"label": "输入中", "tag": "typing", "pin": "straw"},
+    "sending": {"label": "发送中", "tag": "sending", "pin": "orange"},
+    "failed": {"label": "发送失败", "tag": "failed", "pin": "red"},
+    "sent": {"label": "已发送", "tag": "sent", "pin": "green"},
+    "delivered": {"label": "已送达", "tag": "delivered", "pin": "blue"},
+    "read": {"label": "已读", "tag": "read", "pin": "pink"}
+   },
+   "start": "typing",
+   "edges": [
+    {"from": "typing", "to": "sending", "label": "按下发送"},
+    {"from": "sending", "to": "failed", "label": "一直转圈", "if": "没网"},
+    {"from": "failed", "to": "sending", "label": "点重试"},
+    {"from": "sending", "to": "sent", "label": "服务器收下"},
+    {"from": "sent", "to": "delivered", "label": "对方手机收到"},
+    {"from": "delivered", "to": "read", "label": "对方点开"}
+   ],
+   "exit": {"from": "read", "label": "送达靠谁 ↓"},
+   "steps": [
+    {"go": "start", "note": "你打好一句话，还在输入中"},
+    {"go": "typing>sending", "note": "按下发送，小圈开始转"},
+    {"go": "sending>failed", "note": "要是没网，就发送失败"},
+    {"go": "failed>sending", "note": "点一下重试，又回到发送中"},
+    {"go": "sending>sent", "note": "网通了，服务器收下"},
+    {"go": "sent>delivered", "note": "对方手机收到，已送达"},
+    {"go": "delivered>read", "note": "对方点开看了，才算已读"},
+    {"go": "read>exit", "note": "送达这一步，其实不简单"}
+   ]
+  },
+  {
+   "title": "手机和服务器",
+   "sub": "两边同时在忙",
+   "tagline": "phone ‖ server",
+   "states": {
+    "off": {"label": "没信号", "tag": "no signal", "pin": "grey"},
+    "on": {"label": "在线", "tag": "online", "pin": "green"},
+    "idle": {"label": "空闲", "tag": "idle", "pin": "straw"},
+    "store": {"label": "存着消息", "tag": "holding", "pin": "orange"},
+    "push": {"label": "推送中", "tag": "pushing", "pin": "pink"}
+   },
+   "regions": {"id": "both", "title": "同一时间", "lanes": [
+    {"id": "phone", "title": "对方的手机", "tint": "sky", "states": ["off", "on"], "start": "off"},
+    {"id": "server", "title": "服务器", "tint": "mint", "states": ["idle", "store", "push"], "start": "idle"}
+   ]},
+   "edges": [
+    {"from": "off", "to": "on", "label": "出了电梯"},
+    {"from": "on", "to": "off", "label": "进了电梯"},
+    {"from": "idle", "to": "store", "label": "收到消息"},
+    {"from": "store", "to": "push", "label": "开始推送", "if": "手机在线"},
+    {"from": "push", "to": "idle", "label": "对方收到"}
+   ],
+   "exit": {"from": "push", "label": "回执丢了呢 ↓"},
+   "steps": [
+    {"go": "entry", "note": "送达，要靠两边同时配合"},
+    {"go": "idle>store", "note": "服务器收到消息，先存着"},
+    {"go": "off>on", "note": "对方出了电梯，手机又在线"},
+    {"go": "store>push", "note": "手机在线，服务器才推送"},
+    {"go": "push>idle", "note": "对方收到，服务器又空闲了"},
+    {"go": "on>off", "note": "对方再进电梯，又没信号"},
+    {"go": "idle>store", "note": "新消息来了，只能先存着"},
+    {"go": "push>exit", "note": "可要是回执在路上丢了呢？"}
+   ]
+  },
+  {
+   "title": "收到两条",
+   "sub": "重发惹的祸",
+   "tagline": "a rule, and the path that breaks it",
+   "states": {
+    "out": {"label": "已发出", "tag": "sent", "pin": "straw"},
+    "wait": {"label": "等回执", "tag": "waiting for ack", "pin": "orange"},
+    "ok": {"label": "收到回执", "tag": "acked", "pin": "green"},
+    "retry": {"label": "超时重发", "tag": "resend", "pin": "blue"},
+    "twice": {"label": "收到两条", "tag": "duplicate", "pin": "red"}
+   },
+   "start": "out",
+   "rule": {"never": "twice", "stamp": "规则被打破"},
+   "edges": [
+    {"from": "out", "to": "wait", "label": "服务器收下"},
+    {"from": "wait", "to": "ok", "label": "回执到了"},
+    {"from": "wait", "to": "retry", "label": "三秒没回执"},
+    {"from": "retry", "to": "wait", "label": "再发一次"},
+    {"from": "retry", "to": "twice", "label": "又推一遍", "if": "其实到了"}
+   ],
+   "steps": [
+    {"go": "entry", "note": "消息发出去了"},
+    {"go": "out>wait", "note": "服务器收下，手机等回执"},
+    {"go": "wait>ok", "note": "回执到了，一切正常"},
+    {"go": ["wait>retry", "retry>wait"], "on": ["wait"], "note": "三秒没回执，就再发一次"},
+    {"go": "retry>twice", "note": "可第一条其实到了，只是回执慢"},
+    {"trace": true, "note": "检查器顺着红线，找到了两条"},
+    {"note": "给消息编个号，重复的就扔掉"},
+    {"note": "下次消息转圈，你知道它卡在哪一格了"}
+   ]
+  }
+ ]
+}

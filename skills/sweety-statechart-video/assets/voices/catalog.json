@@ -1,0 +1,198 @@
+{
+ "default": "crayon-sister",
+ "about": "Voices designed for sweety-statechart-video (scripts/design_voice.py, assets/voices/designs.json).",
+ "voices": [
+  {
+   "id": "crayon-sister",
+   "name": "蜡笔姐姐",
+   "description": "明亮温暖、带着笑意，像给朋友讲一张手绘图；轻松的生活知识。默认声音。",
+   "reference_audio": "crayon-sister.wav",
+   "reference_text": "crayon-sister.txt",
+   "reference_sha256": "d7aada4b77747f8f7b3f6d9d034b5b48da6fd7c046f398a96ceb9849ae420e84",
+   "transcript_sha256": "64ae792e6a980e5f3ec5814676df99f4fbad85ed1557e5b2df88d9128ef86369",
+   "preview_audio": "previews/crayon-sister.wav",
+   "preview_text": "付了钱，商家叮的一声接了单。厨房开了火，面已经下锅了。",
+   "preview_kind": "same_text",
+   "source": "Synthetic VoxCPM2 voice design from a text description only; no real person, creator or platform voice was cloned or used as reference",
+   "design_prompt": "二十五岁左右的年轻女性，声音明亮温暖，带着笑意，语气轻快亲切，吐字清楚，像在给朋友讲一张手绘图，适合轻松的生活知识科普",
+   "generation": {
+    "model": "VoxCPM2-8bit MLX (mlx-audio 0.5.8)",
+    "mode": "design",
+    "cfg_value": 2.0,
+    "timesteps": 16,
+    "seed": 101,
+    "seeds_tried": [
+     101,
+     202,
+     303,
+     404
+    ],
+    "reference_check": {
+     "cer": 0.022,
+     "gate": {
+      "pause_depth_db": -81.2,
+      "peak_dbfs": -2.39,
+      "tonal_lines_hz_persistence": [],
+      "clipped_fraction": 0.0
+     },
+     "syllables_per_second": 5.18,
+     "f0_median_hz": 272.7,
+     "seconds": 8.8
+    }
+   },
+   "verified_generation_parameters": {
+    "mode": "combined",
+    "cfg_value": 2.0,
+    "timesteps": 10,
+    "seed": 2026
+   },
+   "preferred_engine": "voxcpm",
+   "redistribution": "Distributable: generated with Apache-2.0 VoxCPM2 weights; label as AI-generated when published",
+   "acceptance": "pending_listening"
+  },
+  {
+   "id": "blueprint-guy",
+   "name": "图纸哥",
+   "description": "干净清爽、理性利落，带一点幽默；讲流程、原理和机制。",
+   "reference_audio": "blueprint-guy.wav",
+   "reference_text": "blueprint-guy.txt",
+   "reference_sha256": "b3c0f6fa7a778a9c07971ddec7142afdf6319c0da221618de43a7920dd945a84",
+   "transcript_sha256": "64ae792e6a980e5f3ec5814676df99f4fbad85ed1557e5b2df88d9128ef86369",
+   "preview_audio": "previews/blueprint-guy.wav",
+   "preview_text": "付了钱，商家叮的一声接了单。厨房开了火，面已经下锅了。",
+   "preview_kind": "same_text",
+   "source": "Synthetic VoxCPM2 voice design from a text description only; no real person, creator or platform voice was cloned or used as reference",
+   "design_prompt": "三十岁左右的男性，声音干净清爽，中音明亮，语气理性利落，条理清楚，带一点轻松的幽默感，适合讲流程、原理和机制",
+   "generation": {
+    "model": "VoxCPM2-8bit MLX (mlx-audio 0.5.8)",
+    "mode": "design",
+    "cfg_value": 2.0,
+    "timesteps": 16,
+    "seed": 303,
+    "seeds_tried": [
+     101,
+     202,
+     303,
+     404
+    ],
+    "reference_check": {
+     "cer": 0.022,
+     "gate": {
+      "pause_depth_db": -58.2,
+      "peak_dbfs": -3.8,
+      "tonal_lines_hz_persistence": [],
+      "clipped_fraction": 0.0
+     },
+     "syllables_per_second": 5.87,
+     "f0_median_hz": 111.6,
+     "seconds": 7.84
+    }
+   },
+   "verified_generation_parameters": {
+    "mode": "combined",
+    "cfg_value": 2.0,
+    "timesteps": 10,
+    "seed": 2026
+   },
+   "preferred_engine": "voxcpm",
+   "redistribution": "Distributable: generated with Apache-2.0 VoxCPM2 weights; label as AI-generated when published",
+   "acceptance": "pending_listening"
+  },
+  {
+   "id": "sunny-girl",
+   "name": "元气少女",
+   "description": "清脆甜亮、元气十足，语调上扬；有趣的小科普和生活故事。",
+   "reference_audio": "sunny-girl.wav",
+   "reference_text": "sunny-girl.txt",
+   "reference_sha256": "fcfb21ecd88f75a5436a6ebc1f438038f1652d1c9a5408457799f87328bc0ac7",
+   "transcript_sha256": "64ae792e6a980e5f3ec5814676df99f4fbad85ed1557e5b2df88d9128ef86369",
+   "preview_audio": "previews/sunny-girl.wav",
+   "preview_text": "付了钱，商家叮的一声接了单。厨房开了火，面已经下锅了。",
+   "preview_kind": "same_text",
+   "source": "Synthetic VoxCPM2 voice design from a text description only; no real person, creator or platform voice was cloned or used as reference",
+   "design_prompt": "十八岁左右的少女，声音清脆甜亮，元气十足，语调活泼上扬，语速稍快，充满好奇心，适合有趣的小科普和生活故事",
+   "generation": {
+    "model": "VoxCPM2-8bit MLX (mlx-audio 0.5.8)",
+    "mode": "design",
+    "cfg_value": 2.0,
+    "timesteps": 16,
+    "seed": 101,
+    "seeds_tried": [
+     101,
+     202,
+     303,
+     404
+    ],
+    "reference_check": {
+     "cer": 0.0,
+     "gate": {
+      "pause_depth_db": -83.2,
+      "peak_dbfs": -6.19,
+      "tonal_lines_hz_persistence": [],
+      "clipped_fraction": 0.0
+     },
+     "syllables_per_second": 4.93,
+     "f0_median_hz": 301.9,
+     "seconds": 9.23
+    }
+   },
+   "verified_generation_parameters": {
+    "mode": "combined",
+    "cfg_value": 2.0,
+    "timesteps": 10,
+    "seed": 2026
+   },
+   "preferred_engine": "voxcpm",
+   "redistribution": "Distributable: generated with Apache-2.0 VoxCPM2 weights; label as AI-generated when published",
+   "acceptance": "pending_listening"
+  },
+  {
+   "id": "old-master",
+   "name": "老师傅",
+   "description": "温厚略沙哑、慢悠悠带着笑，像老手艺人边干边讲；手艺、老行当和过日子的道理。",
+   "reference_audio": "old-master.wav",
+   "reference_text": "old-master.txt",
+   "reference_sha256": "71c625d1fad5feef302c8c57b93eb4e889d92d8953f677e2a31771ca550a3303",
+   "transcript_sha256": "64ae792e6a980e5f3ec5814676df99f4fbad85ed1557e5b2df88d9128ef86369",
+   "preview_audio": "previews/old-master.wav",
+   "preview_text": "付了钱，商家叮的一声接了单。厨房开了火，面已经下锅了。",
+   "preview_kind": "same_text",
+   "source": "Synthetic VoxCPM2 voice design from a text description only; no real person, creator or platform voice was cloned or used as reference",
+   "design_prompt": "六十多岁的老年男性，声音温厚，略带沙哑，语速稍慢，带着笑意，朴实亲切，像老手艺人一边干活一边讲，适合讲手艺、老行当和过日子的道理",
+   "generation": {
+    "model": "VoxCPM2-8bit MLX (mlx-audio 0.5.8)",
+    "mode": "design",
+    "cfg_value": 2.0,
+    "timesteps": 16,
+    "seed": 101,
+    "seeds_tried": [
+     101,
+     202,
+     303,
+     404
+    ],
+    "reference_check": {
+     "cer": 0.0,
+     "gate": {
+      "pause_depth_db": -52.5,
+      "peak_dbfs": -9.25,
+      "tonal_lines_hz_persistence": [],
+      "clipped_fraction": 0.0
+     },
+     "syllables_per_second": 3.62,
+     "f0_median_hz": 114.6,
+     "seconds": 12.49
+    }
+   },
+   "verified_generation_parameters": {
+    "mode": "combined",
+    "cfg_value": 2.0,
+    "timesteps": 10,
+    "seed": 2026
+   },
+   "preferred_engine": "voxcpm",
+   "redistribution": "Distributable: generated with Apache-2.0 VoxCPM2 weights; label as AI-generated when published",
+   "acceptance": "pending_listening"
+  }
+ ]
+}
