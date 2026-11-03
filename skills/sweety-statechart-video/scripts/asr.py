@@ -153,8 +153,32 @@ def covers_words(expected, actual, max_wer=MAX_WER):
         fixed.append(token)
     error = edit_rate(want, fixed)
     ok = anchored(want, fixed, error, max_wer, end_slack=0)
-    return {'cer': round(error, 3), 'wer': round(error, 3), 'metric': 'wer', 'status': 'pass' if ok else 'fail',
-            'asr_text': actual.lower()}
+    result = {'cer': round(error, 3), 'wer': round(error, 3), 'metric': 'wer', 'status': 'pass' if ok else 'fail',
+              'asr_text': actual.lower()}
+    if not ok:                     # like the pinyin fallback: Whisper may spell a homophone ("is it read" -> "red")
+        want_keys, heard_keys = [sound_key(word) for word in want], [sound_key(word) for word in fixed]
+        sound_error = edit_rate(want_keys, heard_keys)
+        result['sound_wer'] = round(sound_error, 3)
+        if anchored(want_keys, heard_keys, sound_error, max_wer, end_slack=0):
+            result.update(status='pass', matched_by='sound')
+    return result
+
+
+def sound_key(word):
+    """American Soundex of a word (read / red -> R300): the homophone fallback for spaced languages."""
+    codes = {**dict.fromkeys('bfpv', '1'), **dict.fromkeys('cgjkqsxz', '2'), **dict.fromkeys('dt', '3'), 'l': '4',
+             **dict.fromkeys('mn', '5'), 'r': '6'}
+    letters = [ch for ch in word.lower() if ch.isalpha()]
+    if not letters:
+        return word
+    out, previous = letters[0].upper(), codes.get(letters[0], '')
+    for ch in letters[1:]:
+        code = codes.get(ch, '')
+        if code and code != previous:
+            out += code
+        if ch not in 'hw':
+            previous = code
+    return (out + '000')[:4]
 
 
 def english_words(text):

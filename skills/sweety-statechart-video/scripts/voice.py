@@ -59,6 +59,7 @@ import i18n
 CHECKS_VERSION = 2              # 2: a pinyin-only pass earns one more seed
 ATTEMPTS = 4
 SPEECH_RATE_RANGE = (3., 8.)   # syllables/s of speech span; only gross stretching or truncation (realistic-man ~6.6)
+SPEECH_RATE_RANGE_WORDS = (2., 7.)  # spaced languages (vowel groups): old-master reads English at 2.1-2.9 with CER 0
 LEAD_SECONDS = .06             # kept before the first speech frame
 RAW_TAIL_SECONDS = .6          # kept after the last speech frame until the tail rule decides
 TAIL_QUIET_DB = -40.           # the last syllable has ended once the level stays this far under the clip peak...
@@ -408,8 +409,9 @@ def check_take(audio, reading, whisper, exceptions, language='zh'):
     start, end = speech_span(audio)
     syllables = spoken_syllables(reading)
     rate = syllables / max(.01, end - start)
-    if syllables >= 4 and not SPEECH_RATE_RANGE[0] <= rate <= SPEECH_RATE_RANGE[1]:
-        failures.append(f'speech rate {rate:.2f} syllables/s outside {SPEECH_RATE_RANGE}')
+    low, high = SPEECH_RATE_RANGE_WORDS if i18n.uses_words(language) else SPEECH_RATE_RANGE
+    if syllables >= 4 and not low <= rate <= high:
+        failures.append(f'speech rate {rate:.2f} syllables/s outside {(low, high)}')
     result = {'gate': {key: gate.get(key) for key in ('pause_depth_db', 'peak_dbfs', 'tonal_lines_hz_persistence', 'clipped_fraction')},
               'syllables_per_second': round(rate, 2)}
     words = None
@@ -433,7 +435,7 @@ def check_take(audio, reading, whisper, exceptions, language='zh'):
             heard = whisper.transcribe(kept)
             coverage = covers(reading, heard['text'])
             result.update(asr=heard['text'], cer=coverage['cer'], words=heard['words'],
-                          **{key: coverage[key] for key in ('matched_by', 'pinyin_cer') if key in coverage})
+                          **{key: coverage[key] for key in ('matched_by', 'pinyin_cer', 'sound_wer') if key in coverage})
             if coverage['status'] != 'pass':
                 failures.append(f"after the tail cut, ASR does not cover the reading (CER {coverage['cer']}): {heard['text']!r}")
             if not i18n.uses_words(language) and english_words(reading):
@@ -471,10 +473,10 @@ def generate(engine, reading, seeds, whisper, exceptions, label, control=None, l
         log(f"[{label}] seed {seed}: synth {synth_seconds:.1f}s, check {check['check_seconds']:.1f}s, {check['status']} {summary}"
             + ('' if check['status'] == 'PASS' else ' - ' + '; '.join(check['failures'])))
         if check['status'] == 'PASS':
-            exact = check.get('matched_by') != 'pinyin'
+            exact = check.get('matched_by') not in ('pinyin', 'sound')
             if held is None and not exact and index + 1 < len(seeds):
                 held = (kept, check.get('words'), check.get('cer', 1.), index)
-                log(f'[{label}] passed on toneless pinyin only; trying one more seed for an exact character match')
+                log(f'[{label}] passed on sound-alikes only (toneless pinyin or Soundex); trying one more seed for an exact match')
                 continue
             if held is not None and not exact and check.get('cer', 1.) >= held[2]:
                 break  # the extra seed is no better: keep the held take
@@ -701,7 +703,7 @@ def main():
             coverage = covers(reading, heard['text'])
             if coverage['status'] == 'pass':
                 record.update(asr=heard['text'], cer=coverage['cer'], words=heard['words'], asr_checked=True,
-                              **{key: coverage[key] for key in ('matched_by', 'pinyin_cer') if key in coverage})
+                              **{key: coverage[key] for key in ('matched_by', 'pinyin_cer', 'sound_wer') if key in coverage})
                 record_path.write_text(json.dumps(record, ensure_ascii=False, indent=1))
                 log(f'[{identifier}] cached unchecked take now ASR-checked: cer {coverage["cer"]}')
             else:
@@ -732,7 +734,7 @@ def main():
             record = {'status': 'pass', 'key': key, 'reading': reading, 'tone': control, 'tone_mode': TONE_MODE if control else None,
                       'seed': final['seed'], 'dur': round(len(kept) / SR, 3), 'syllables_per_second': final.get('syllables_per_second'),
                       'asr': final.get('asr'), 'cer': final.get('cer'), 'words': words, 'asr_checked': bool(whisper),
-                      **{key: final[key] for key in ('matched_by', 'pinyin_cer') if key in final},
+                      **{key: final[key] for key in ('matched_by', 'pinyin_cer', 'sound_wer') if key in final},
                       'synth_seconds': round(sum(item.get('synth_seconds', 0) for item in attempts), 2),
                       'check_seconds': round(sum(item.get('check_seconds', 0) for item in attempts), 2),
                       'attempts': attempts, 'identity': engine.identity}
@@ -743,7 +745,7 @@ def main():
                       if record.get('words') else (None, 'no ASR timestamps'))
         entries[identifier] = {'dur': record['dur'], 'text': line['text'], 'reading': reading, 'tone': control, 'voice': engine.identity['voice'], 'asr': record.get('asr'),
                                'cer': record.get('cer'), 'seed': record['seed'], 'chars': chars,
-                               **{key: record[key] for key in ('matched_by', 'pinyin_cer') if key in record},
+                               **{key: record[key] for key in ('matched_by', 'pinyin_cer', 'sound_wer') if key in record},
                                **({'chars_note': why} if chars is None else {}),
                                'asr_checked': record.get('asr_checked', False), 'attempts': len(record['attempts']),
                                'synth_seconds': record['synth_seconds'], 'lufs': loudness_lufs(kept),
