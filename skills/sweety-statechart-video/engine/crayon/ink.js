@@ -361,6 +361,13 @@
       }
       ctx.fillText(str, x, y);
       if (o.double) { ctx.globalAlpha *= .35; ctx.fillText(str, x + .7, y + .4); }   // a second strike, slightly off
+      // a pen writes rather than types: the next letter appears as the nib sweeps across it
+      const frac = o.chars != null ? o.chars - Math.floor(o.chars) : 0, next = Array.from(s)[Math.floor(o.chars || 0)];
+      if (!S.inkText && frac > 0 && next) {
+        const x0 = x + ctx.measureText(str).width, cw = ctx.measureText(next).width, fs = parseFloat((ctx.font.match(/(\d+(?:\.\d+)?)px/) || [0, 20])[1]);
+        ctx.save(); ctx.beginPath(); ctx.rect(x0 - 1, y - fs * 1.1, cw * frac + 1, fs * 1.5); ctx.clip();
+        ctx.textAlign = 'left'; ctx.globalAlpha = (o.alpha ?? 1) * S.reveal; ctx.fillText(next, x0, y); ctx.restore();
+      }
     }
     ctx.restore();
   }
@@ -377,6 +384,12 @@
         const chars = Array.from(p), guard = p[0] === '[', vis = Math.max(0, Math.min(chars.length, total - used));
         used += chars.length;
         if (vis > 0) { ctx.fillStyle = grain(guard ? (o.guardColor || C.guard) : (o.color || C.inkD), .15); ctx.globalAlpha = A; ctx.fillText(chars.slice(0, vis).join(''), cx, y + li * lh); }
+        const part = total - Math.floor(total);                  // the pen's half-written letter
+        if (!S.inkText && part > 0 && vis >= 0 && vis < chars.length && used - chars.length + vis === Math.floor(total)) {
+          const px = cx + ctx.measureText(chars.slice(0, vis).join('')).width, cw = ctx.measureText(chars[vis]).width;
+          ctx.save(); ctx.beginPath(); ctx.rect(px - 1, y + li * lh - size * 1.1, cw * part + 1, size * 1.5); ctx.clip();
+          ctx.fillStyle = grain(guard ? (o.guardColor || C.guard) : (o.color || C.inkD), .15); ctx.globalAlpha = A; ctx.fillText(chars[vis], px, y + li * lh); ctx.restore();
+        }
         cx += ctx.measureText(p).width;
       }
     });

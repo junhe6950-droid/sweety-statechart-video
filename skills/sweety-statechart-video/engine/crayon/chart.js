@@ -105,15 +105,16 @@
       K.line(ctx, pts, { closed: true, w: 1.8, color: edge });
       return { ring: rrect(L - 7, T - 7, R + 7, B + 7, 6), pin: false, labelDx: 16 };
     }
-    if (look === 'patch') {                   // a felt patch: fuzzy edge, a stitched border inside
-      const pts = rrect(L, T, R, B, 12);
-      shadow(pts); K.hatch(ctx, pts, { color: colour(st.tint || 'straw'), solid: C.card, base: .7, gap: 2.4, w: 1.6, angle: .7, layers: [{}, { angle: -.7, gap: 3.2, alpha: .6 }] }); wash(pts);
+    if (look === 'patch') {                   // a felt patch: fuzzy edge, a stitched border inside; on the happy path navy
+      const pts = rrect(L, T, R, B, 12);      // felt with gold stitches, off it pale linen (Catch's chart)
+      const felt = st.happy === true ? colour('navy') : st.happy === false ? colour('grey') : colour(st.tint || 'straw');
+      shadow(pts); K.hatch(ctx, pts, { color: felt, solid: C.card, base: .7, gap: 2.4, w: 1.6, angle: .7, layers: [{}, { angle: -.7, gap: 3.2, alpha: .6 }] }); wash(pts);
       K.seed('fuzz' + b.id);
       const E = K.resample(pts, 5, true);
-      for (const q of E) K.line(ctx, [q, [q[0] + K.rnd(-3, 3), q[1] + K.rnd(-3, 3)]], { w: 1, color: colour(st.tint || 'straw'), passes: 1, alpha: .8, taper: false });
+      for (const q of E) K.line(ctx, [q, [q[0] + K.rnd(-3, 3), q[1] + K.rnd(-3, 3)]], { w: 1, color: felt, passes: 1, alpha: .8, taper: false });
       const S = K.resample(rrect(L + 7, T + 7, R - 7, B - 7, 7), 9, true);
-      for (let i = 0; i < S.length - 1; i += 2) K.line(ctx, [S[i], S[i + 1]], { w: 1.6, color: C.straw, passes: 1, taper: false });
-      return { ring: rrect(L - 8, T - 8, R + 8, B + 8, 16), pin: false };
+      for (let i = 0; i < S.length - 1; i += 2) K.line(ctx, [S[i], S[i + 1]], { w: 1.6, color: st.happy === false ? C.past : C.straw, passes: 1, taper: false });
+      return { ring: rrect(L - 8, T - 8, R + 8, B + 8, 16), pin: false, onDark: st.happy === true };
     }
     const pts = b.kind === 'error' ? tornPts(x, y, w, h) : ticketPts(x, y, w, h);   // the reference's ticket
     shadow(pts);
@@ -148,7 +149,7 @@
     if (shape.rule) K.line(ctx, [[x - w / 2 + 8, y - h / 2 + 19], [x + w / 2 - 8, y - h / 2 + 19]], { color: C.guard, w: 1.1, passes: 1, amp: .5, alpha: .8, taper: false });
     const cs = (K.layout && K.layout.size.card) || 23;
     const fs = fitFont(ctx, b.label, w - 22, b.size || cs, 14, FONT.type);
-    K.text(ctx, b.label, x + (shape.labelDx || 0), y + h / 2 - 13 + (h - 56) * .1 - (shape.rule || b.tag ? 0 : 4), { font: `${fs}px ${FONT.type}`, align: 'center', color: kind === 'undo' ? C.past : C.cardInk, double: true });
+    K.text(ctx, b.label, x + (shape.labelDx || 0), y + h / 2 - 13 + (h - 56) * .1 - (shape.rule || b.tag ? 0 : 4), { font: `${fs}px ${FONT.type}`, align: 'center', color: shape.onDark ? C.card : kind === 'undo' ? C.past : C.cardInk, double: true });
     if (kind === 'undo') { K.seed('tku' + b.id); K.line(ctx, [[x - w / 2 + 16, y + 8], [x + w / 2 - 16, y + 2]], { w: 2.4, color: C.guard, alpha: .8 }); }
     if (kind === 'wait') clock(ctx, x + w / 2 - 14, y - h / 2 + 2, 11, st.at || 0);
     // the pin: falls in, bites, then bobs while its card is active

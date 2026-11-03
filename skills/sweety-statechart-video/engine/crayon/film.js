@@ -368,7 +368,8 @@
       const bad = id === never && (on || si >= list.length) && !(fixed && fixT > 1.6);
       const lane = b.lane && ch.regions ? ch.regions.lanes.find(l => l.id === b.lane) : null;
       K.chart.ticket(g, b, { active: on && arrived, at: t, pop, squash, drop, swing: swing != null && swing >= 0 ? swing : null, ring, alpha: pop < 1 ? K.clamp((t - .85) / .25) : 1, bad, past: fade && !on && b.kind !== 'final',
-        onBug: traced && ch.bug && ch.bug.states.has(id) && !(fixed && fixT > 1.6), tint: (lane && lane.tint) || (ch.states[id] && ch.states[id].tint) });
+        onBug: traced && ch.bug && ch.bug.states.has(id) && !(fixed && fixT > 1.6), tint: (lane && lane.tint) || (ch.states[id] && ch.states[id].tint),
+        happy: ch.happy ? ch.happy.includes(id) : null });
     }
     for (const q of beads) K.chart.bead(g, q[0], q[1], T);
     const stampAt = stampStep(ch);
