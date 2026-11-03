@@ -919,6 +919,216 @@
     K.hatch(ctx, K.rect(x - 40 * s, y - 2 * s - 6 * s, 80 * s, 5 * s), { color: C.white, base: .7, gap: 2 });
   };
 
+  /* ================= a bubble-tea shop ================= */
+  P.bubbleTea = (ctx, x, y, s = 1, o = {}) => {           // y = bottom; o.tea colour (tan, lilac taro, pink, ochre), o.level 0..1, o.straw, o.t
+    K.seed('boba' + x.toFixed(0) + y);
+    const w0 = 25 * s, w1 = 32 * s, h = 112 * s, tea = o.tea || 'tan', lv = K.clamp(o.level ?? .86), t = o.t || 0;
+    const cup = [[x - w1, y - h], [x + w1, y - h], [x + w0, y], [x - w0, y]];
+    const ty = y - h * lv, tw = w0 + (w1 - w0) * lv;
+    if (lv > 0) K.hatch(ctx, [[x - tw + 2 * s, ty], [x + tw - 2 * s, ty], [x + w0 - 2 * s, y - 2 * s], [x - w0 + 2 * s, y - 2 * s]], { color: col(tea), base: .75, gap: 3, layers: [{ color: col(DK[tea] || tea), alpha: .35, angle: .5, gap: 6 }] });
+    if (o.tiger) for (let i = 0; i < 4; i++) K.line(ctx, K.qbez([x - tw + 4 * s, ty + (14 + i * 18) * s], [x, ty + (6 + i * 18) * s], [x + tw - 4 * s, ty + (16 + i * 18) * s], 6), { color: C.brown, w: TW('structure', s), passes: 1, alpha: .7 });
+    for (let i = 0; i < 2 && lv > .5; i++) K.shape(ctx, K.turn(K.rect(x - 16 * s + i * 14 * s, ty + 6 * s, 14 * s, 13 * s), x, ty, .1 - i * .2), { fill: C.white, h: { base: .45, gap: 3, layers: [{ color: C.sky, alpha: .4 }] }, w: TW('detail'), stroke: C.blueL });
+    const n = o.pearls ?? 14;
+    for (let i = 0; i < n; i++) { const r2 = i % 5, row = Math.floor(i / 5), px = x - w0 * .7 + r2 * w0 * .35 + (row % 2) * 4 * s, py = y - 8 * s - row * 9 * s + Math.sin(t * 2 + i) * .8 * s; K.dot(ctx, px, py, 4.4 * s, C.brown, { w: TW('detail'), h: { base: .95, gap: 2, layers: [{ color: C.navy, alpha: .5 }] } }); }
+    K.line(ctx, cup, { closed: true, w: TW('outline', s) * .8, color: C.ink });
+    K.line(ctx, [[x - w1 * .7, y - h * .9], [x - w0 * .65, y - h * .2]], { color: C.white, w: TW('structure', s), passes: 1, alpha: .8 });
+    K.shape(ctx, K.ell(x, y - h, w1 + 2 * s, 7 * s, 20), fillT(o.lid || 'rose', s * .6, { base: .5, gap: 3 }));
+    if (o.straw !== false) K.shape(ctx, K.capsule([[x + 6 * s, y - h + 2 * s], [x + 14 * s, y - h - 44 * s]], 7 * s), fillT(o.straw || 'pink', s * .6, { gap: 2.2 }));
+  };
+  P.shaker = (ctx, x, y, s = 1, o = {}) => {              // a cocktail shaker; y = bottom; o.shake (with o.t) rocks it
+    K.seed('shaker' + x.toFixed(0) + y);
+    const a = o.shake ? Math.sin((o.t || 0) * 16) * .28 : (o.tilt || 0);
+    ctx.save(); ctx.translate(x, y - 50 * s); ctx.rotate(a); ctx.translate(-x, -(y - 50 * s));
+    K.shape(ctx, [[x - 20 * s, y - 70 * s], [x + 20 * s, y - 70 * s], [x + 16 * s, y], [x - 16 * s, y]], deep('grey', s, { layers: [{ color: C.white, alpha: .5, angle: -1.4, gap: 6 }] }));
+    K.shape(ctx, [[x - 16 * s, y - 92 * s], [x + 16 * s, y - 92 * s], [x + 21 * s, y - 70 * s], [x - 21 * s, y - 70 * s]], deep('grey', s));
+    K.shape(ctx, K.rounded([[x - 7 * s, y - 106 * s], [x + 7 * s, y - 106 * s], [x + 9 * s, y - 92 * s], [x - 9 * s, y - 92 * s], [x - 7 * s, y - 106 * s]], 3 * s), fillT('grey', s * .6));
+    K.line(ctx, [[x - 10 * s, y - 62 * s], [x - 8 * s, y - 8 * s]], { color: C.white, w: TW('structure', s), passes: 1 });
+    ctx.restore();
+    if (o.shake) for (const d of [-1, 1]) K.line(ctx, [[x + d * 30 * s, y - 80 * s], [x + d * 40 * s, y - 88 * s]], { w: TW('detail'), passes: 1 });
+  };
+  P.register = (ctx, x, y, s = 1, o = {}) => {            // a till; y = counter top; o.price on the tag, o.open 0..1 slides the drawer
+    K.seed('till' + x.toFixed(0) + y);
+    const op = K.clamp(o.open || 0);
+    if (op > 0) { K.shape(ctx, K.rect(x - 40 * s, y - 2 * s, 80 * s, 16 * s * op), fillT('blueL', s * .7)); for (let i = 0; i < 3; i++) K.dot(ctx, x - 20 * s + i * 20 * s, y + 6 * s * op, 5 * s, C.straw, { w: TW('detail') }); }
+    K.shape(ctx, [[x - 50 * s, y - 26 * s], [x + 50 * s, y - 26 * s], [x + 54 * s, y], [x - 54 * s, y]], deep(o.color || 'blueL', s));
+    K.shape(ctx, [[x - 40 * s, y - 66 * s], [x + 30 * s, y - 66 * s], [x + 40 * s, y - 26 * s], [x - 40 * s, y - 26 * s]], deep('grey', s));
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) K.shape(ctx, K.rect(x - 32 * s + c * 15 * s + r * 2 * s, y - 60 * s + r * 11 * s, 11 * s, 7 * s), fillT('white', s * .4, { base: .4, gap: 2.4 }));
+    K.line(ctx, [[x + 14 * s, y - 66 * s], [x + 14 * s, y - 80 * s]], { w: TW('structure', s) });
+    K.shape(ctx, K.rect(x - 14 * s, y - 108 * s, 56 * s, 28 * s), fillT('white', s * .6, { base: .3, layers: [{ color: C.cream, alpha: .5 }] }));
+    K.text(ctx, String(o.price ?? '¥18'), x + 14 * s, y - 88 * s, { font: `${Math.round(16 * s)}px ${FONT.type}`, align: 'center', color: C.navy });
+    K.line(ctx, [[x - 50 * s, y - 13 * s], [x + 50 * s, y - 13 * s]], { w: TW('detail'), passes: 1 });
+  };
+  P.coins = (ctx, x, y, s = 1, o = {}) => {               // a little heap of coins; y = the surface
+    K.seed('coins' + x.toFixed(0) + y);
+    const n = o.n || 3;
+    for (let i = 0; i < n; i++) { const cx = x + (i - (n - 1) / 2) * 15 * s + K.rnd(-2, 2) * s, cy = y - 4 * s - (i % 2) * 5 * s; K.shape(ctx, K.ell(cx, cy, 12 * s, 5 * s, 16), fillT('straw', s * .5, { layers: [{ color: C.ochre, alpha: .6 }] })); K.line(ctx, K.ell(cx, cy, 7 * s, 2.6 * s, 12), { closed: true, w: TW('detail'), color: C.ochre, passes: 1 }); }
+  };
+  P.bell = (ctx, x, y, s = 1, o = {}) => {                // a service bell; y = the counter; o.ring (with o.t) shakes and sends lines out
+    K.seed('bell' + x.toFixed(0) + y);
+    const t = o.t || 0, j = o.ring ? Math.sin(t * 40) * 1.5 * s : 0;
+    K.shape(ctx, K.ell(x, y - 4 * s, 34 * s, 7 * s, 20), deep('tan', s));
+    K.shape(ctx, K.ell(x + j, y - 8 * s, 26 * s, 26 * s, 24, PI, TAU).concat([[x + 26 * s + j, y - 8 * s], [x - 26 * s + j, y - 8 * s]]), deep('straw', s));
+    K.line(ctx, K.ell(x - 8 * s + j, y - 22 * s, 8 * s, 6 * s, 10, PI * 1.1, PI * 1.6), { color: C.white, w: TW('structure', s), passes: 1 });
+    K.shape(ctx, K.rect(x - 3 * s + j, y - 40 * s, 6 * s, 8 * s), fillT('navy', s * .4)); K.dot(ctx, x + j, y - 42 * s, 5 * s, C.navy, { w: TW('detail') });
+    if (o.ring) { const k = (t * 2.5) % 1; ctx.save(); ctx.globalAlpha = 1 - k; for (let i = 0; i < 3; i++) { const a = -PI * (.25 + i * .25); K.line(ctx, [[x + Math.cos(a) * (36 + k * 10) * s, y - 20 * s + Math.sin(a) * (30 + k * 10) * s], [x + Math.cos(a) * (48 + k * 10) * s, y - 20 * s + Math.sin(a) * (42 + k * 10) * s]], { w: TW('structure', s), passes: 1 }); K.line(ctx, [[x - Math.cos(a) * (36 + k * 10) * s, y - 20 * s + Math.sin(a) * (30 + k * 10) * s], [x - Math.cos(a) * (48 + k * 10) * s, y - 20 * s + Math.sin(a) * (42 + k * 10) * s]], { w: TW('structure', s), passes: 1 }); } ctx.restore(); }
+  };
+  P.pager = (ctx, x, y, s = 1, o = {}) => {               // a restaurant pager; y = the surface; o.buzz (with o.t) jitters and blinks
+    K.seed('pager' + x.toFixed(0) + y);
+    const t = o.t || 0, j = o.buzz ? Math.sin(t * 50) * 2 * s : 0, on = o.buzz ? Math.sin(t * 9) > 0 : false;
+    K.shape(ctx, K.rounded([[x - 30 * s + j, y - 20 * s], [x + 30 * s + j, y - 20 * s], [x + 32 * s + j, y], [x - 32 * s + j, y], [x - 30 * s + j, y - 20 * s]], 8 * s), deep(o.color || 'navy', s));
+    for (let i = 0; i < 3; i++) K.blob(ctx, x - 14 * s + i * 14 * s + j, y - 10 * s, 3.4 * s, on ? C.yolk : (i === 1 ? C.straw : C.lilac), 1);
+    if (o.num) K.text(ctx, String(o.num), x + j, y - 24 * s, { font: `${Math.round(12 * s)}px ${FONT.mono}`, align: 'center', color: C.red });
+    if (o.buzz) for (const d of [-1, 1]) K.line(ctx, [[x + d * 38 * s, y - 16 * s], [x + d * 46 * s, y - 22 * s]], { w: TW('detail'), passes: 1 });
+  };
+  P.pearlPot = (ctx, x, y, s = 1, o = {}) => {            // a pot of pearls on a little stove; y = the shelf; o.low, o.t (steam)
+    K.seed('ppot' + x.toFixed(0) + y);
+    K.shape(ctx, K.rect(x - 52 * s, y - 40 * s, 104 * s, 40 * s), deep('cream', s));
+    for (let i = 0; i < 3; i++) K.dot(ctx, x - 30 * s + i * 18 * s, y - 24 * s, 5 * s, C.white, { w: TW('detail') });
+    K.line(ctx, [[x - 34 * s, y - 10 * s], [x + 30 * s, y - 10 * s]], { w: 3 * s, color: C.grey, passes: 1 });
+    const py = y - 42 * s;
+    K.shape(ctx, [[x - 40 * s, py - 46 * s], [x + 40 * s, py - 46 * s], [x + 36 * s, py], [x - 36 * s, py]], deep(o.color || 'rose', s));
+    for (const d of [-1, 1]) K.line(ctx, [[x + d * 40 * s, py - 38 * s], [x + d * 50 * s, py - 38 * s]], { w: 5 * s, color: col(o.color) || C.rose });
+    const n = o.low ? 5 : 11;
+    for (let i = 0; i < n; i++) K.dot(ctx, x - 30 * s + (i % 6) * 12 * s + (i > 5 ? 6 * s : 0), py - 48 * s - (i > 5 ? 8 * s : 0), 6 * s, C.brown, { w: TW('detail'), h: { base: .95, gap: 2 } });
+    K.shape(ctx, K.ell(x, py - 46 * s, 41 * s, 6 * s, 20), fillT('rose', s * .5, { base: .3 }));
+    if (o.t != null) for (let k = 0; k < 3; k++) P.steam(ctx, x - 16 * s + k * 16 * s, py - 62 * s, o.t, k + x, 50 * s, 4 * s, C.ink);
+  };
+  P.menuBoard = (ctx, x, y, w = 300, h = 150, o = {}) => {  // x, y = top-left; o.title, o.items [[name, price], ...], o.hang length of the wires
+    K.seed('menu' + x.toFixed(0) + y);
+    if (o.hang !== 0) for (const d of [.08, .92]) K.line(ctx, [[x + w * d, y], [x + w * d + (d < .5 ? -18 : 18), y - (o.hang || 40)]], { w: TW('detail'), passes: 1 });
+    K.shape(ctx, K.rect(x - 8, y - 8, w + 16, h + 16), deep('tan', 1));
+    K.shape(ctx, K.rect(x, y, w, h), fillT('cream', 1, { base: .45, layers: [{ color: C.creamD, alpha: .4 }] }));
+    const items = o.items || [['珍珠奶茶', '¥12'], ['黑糖波波', '¥15'], ['芋泥啵啵', '¥14']], fs = Math.min(18, h / (items.length + 2));
+    K.text(ctx, o.title || 'menu', x + w / 2, y + fs * 1.5, { font: `${Math.round(fs * 1.1)}px ${FONT.type}`, align: 'center', color: C.navy });
+    items.forEach(([n, p], i) => { const yy = y + fs * (3 + i * 1.6); K.text(ctx, n, x + 16, yy, { font: `${Math.round(fs)}px ${FONT.mono}`, color: C.navy }); K.text(ctx, p, x + w - 16, yy, { font: `${Math.round(fs)}px ${FONT.mono}`, align: 'right', color: C.navy }); });
+  };
+  P.pearlJar = (ctx, x, y, s = 1, o = {}) => {            // a glass jar of pearls; y = bottom; o.label, o.n pearls, o.lid
+    K.seed('pjar' + x.toFixed(0) + y);
+    const w = 34 * s, h = 76 * s;
+    for (let i = 0; i < (o.n ?? 9); i++) K.dot(ctx, x - w * .6 + (i % 4) * w * .4, y - 8 * s - Math.floor(i / 4) * 10 * s, 5.4 * s, C.brown, { w: TW('detail'), h: { base: .95, gap: 2 } });
+    K.line(ctx, K.rounded([[x - w, y - h * .86], [x + w, y - h * .86], [x + w, y], [x - w, y], [x - w, y - h * .86]], 8 * s), { closed: true, w: TW('outline', s) * .8 });
+    K.line(ctx, [[x + w * .7, y - h * .7], [x + w * .7, y - h * .25]], { color: C.white, w: TW('structure', s), passes: 1 });
+    K.shape(ctx, K.rect(x - w * .85, y - h, w * 1.7, h * .16), deep(o.lid || 'rose', s));
+    if (o.label) { K.shape(ctx, K.rect(x - w * .7, y - h * .58, w * 1.4, h * .28), fillT('white', s * .5, { base: .3 })); K.text(ctx, o.label, x, y - h * .38, { font: `${Math.round(13 * s)}px ${FONT.type}`, align: 'center', color: C.red }); }
+  };
+  P.soldOutJar = (ctx, x, y, s = 1, o = {}) => { P.pearlJar(ctx, x, y, s, { label: o.text || 'sold out', n: o.n ?? 2, lid: o.lid }); if (o.coin !== false) P.coins(ctx, x + 50 * s, y, .6 * s, { n: 1 }); };
+  P.hourglass = (ctx, x, y, s = 1, t = 0, o = {}) => {    // x, y = the middle; sand runs down over o.p (0..1) or loops with t
+    K.seed('hglass' + x.toFixed(0) + y);
+    const p = o.p != null ? K.clamp(o.p) : (t * .12) % 1, w = 30 * s, h = 52 * s;
+    const top = [[x - w, y - h], [x + w, y - h], [x + 4 * s, y], [x - 4 * s, y]], bot = [[x - 4 * s, y], [x + 4 * s, y], [x + w, y + h], [x - w, y + h]];
+    const st = (1 - p) * h * .85;
+    if (st > 2) K.hatch(ctx, [[x - w * st / h, y - st], [x + w * st / h, y - st], [x + 3 * s, y - 2 * s], [x - 3 * s, y - 2 * s]], { color: C.ochre, base: .9, gap: 2.4 });
+    const sb = p * h * .7;
+    if (sb > 2) K.hatch(ctx, [[x - w * .3, y + h - sb], [x + w * .3, y + h - sb], [x + w * .95, y + h - 2 * s], [x - w * .95, y + h - 2 * s]], { color: C.straw, base: .9, gap: 2.4, layers: [{ color: C.ochre, alpha: .5 }] });
+    if (p < 1) K.line(ctx, [[x, y], [x, y + h - sb]], { color: C.ochre, w: 1.6, passes: 1 });
+    K.line(ctx, top, { closed: true, w: TW('structure', s), color: C.ink }); K.line(ctx, bot, { closed: true, w: TW('structure', s), color: C.ink });
+    for (const yy of [y - h - 8 * s, y + h]) K.shape(ctx, K.rect(x - w - 8 * s, yy, 2 * w + 16 * s, 8 * s), deep('brown', s));
+    for (const d of [-1, 1]) K.line(ctx, [[x + d * (w + 4 * s), y - h], [x + d * (w + 4 * s), y + h]], { w: TW('structure', s), color: C.brown });
+  };
+  P.ladybug = (ctx, x, y, s = 1, t = 0, o = {}) => {      // y = the ground; legs scuttle with t
+    K.seed('lbug' + x.toFixed(0) + y);
+    const f = o.f || 1;
+    for (let i = 0; i < 3; i++) { const lx = x - 8 * s + i * 8 * s, k = Math.sin(t * 14 + i * 2) * 3 * s; K.line(ctx, [[lx, y - 6 * s], [lx + k - 4 * s, y]], { w: TW('detail'), color: C.ink, passes: 1 }); }
+    K.shape(ctx, K.ell(x + f * 15 * s, y - 8 * s, 7 * s, 6 * s, 12), fillT('ink', s * .4, { base: .95 }));
+    for (const d of [-1, 1]) K.line(ctx, K.qbez([x + f * 19 * s, y - 12 * s], [x + f * 24 * s, y - 20 * s + d * 2 * s], [x + f * (24 + d * 2) * s, y - 24 * s], 4), { w: TW('detail'), passes: 1, color: C.ink });
+    K.shape(ctx, K.ell(x, y - 10 * s, 15 * s, 11 * s, 18, PI, TAU).concat([[x + 15 * s, y - 6 * s], [x - 15 * s, y - 6 * s]]), fillT('red', s * .5, { base: .9 }));
+    K.line(ctx, [[x, y - 21 * s], [x, y - 6 * s]], { w: TW('detail'), passes: 1, color: C.ink });
+    for (const [dx, dy] of [[-7, -14], [6, -15], [-9, -9], [8, -9]]) K.blob(ctx, x + dx * s, y + dy * s, 2.4 * s, C.ink, 1);
+  };
+
+  /* ================= science ================= */
+  P.cell = (ctx, x, y, r = 50, o = {}) => {               // x, y = the middle; o.p 0..1 pinches it into two; o.color, o.t
+    K.seed('cell' + x.toFixed(0) + y);
+    const p = K.clamp(o.p || 0), t = o.t || 0, c = o.color || 'mint', wob = 1 + Math.sin(t * 2) * .02;
+    const nuc = (cx, cy, rr) => { K.shape(ctx, K.ell(cx, cy, rr, rr * .9, 16), fillT('lilac', rr / 30, { layers: [{ color: C.violet, alpha: .4 }] })); K.blob(ctx, cx - rr * .3, cy - rr * .2, rr * .22, C.violet, .8); };
+    if (p < .86) {
+      const pts = [];
+      for (let i = 0; i < 48; i++) { const a = i / 48 * TAU, ca = Math.cos(a), sa = Math.sin(a); pts.push([x + ca * r * (1 + .62 * p) * wob, y + sa * r * (1 - .1 * p) * (1 - p * .95 * Math.pow(1 - Math.abs(ca), 2))]); }
+      K.shape(ctx, K.smooth(pts, 1), fillT(c, r / 40, { base: .55, layers: [{ color: col(c) }, { color: DK[c] || C.teal, angle: .5, gap: 7, alpha: .3 }] }));
+      if (p < .45) nuc(x, y, r * .36); else { const d = r * (.3 + p * .7); nuc(x - d, y, r * .3); nuc(x + d, y, r * .3); }
+    } else {
+      const d = r * 1.18, rr = r * .84;
+      for (const sd of [-1, 1]) { K.shape(ctx, K.smooth(K.ell(x + sd * d, y, rr * wob, rr, 28), 1), fillT(c, r / 40, { base: .55, layers: [{ color: col(c) }, { color: DK[c] || C.teal, angle: .5, gap: 7, alpha: .3 }] })); nuc(x + sd * d, y, rr * .36); }
+    }
+  };
+  P.dna = (ctx, x, y, h = 200, o = {}) => {               // a double helix, x = middle, y = top; turns with o.t
+    K.seed('dna' + x.toFixed(0) + y);
+    const t = o.t || 0, w = o.w || h * .16, n = 40, A = [], B = [], cols = o.colors || ['red', 'straw', 'green', 'blue'];
+    for (let i = 0; i <= n; i++) { const yy = y + i * h / n, a = i * .42 + t * 1.6; A.push([x + Math.sin(a) * w, yy, Math.cos(a)]); B.push([x - Math.sin(a) * w, yy, -Math.cos(a)]); }
+    for (let i = 1; i < n; i += 2) K.line(ctx, [[A[i][0], A[i][1]], [B[i][0], B[i][1]]], { color: col(cols[(i >> 1) % cols.length]), w: TW('outline', 1) * .9, passes: 1 });
+    for (const [S, c] of [[A, 'blue'], [B, 'pink']]) for (let i = 0; i < n; i++) { const front = S[i][2] > 0; K.line(ctx, [[S[i][0], S[i][1]], [S[i + 1][0], S[i + 1][1]]], { color: col(c), w: front ? 5 : 3, alpha: front ? 1 : .5, passes: 1 }); }
+  };
+  P.chromosome = (ctx, x, y, s = 1, o = {}) => {          // an X; o.split 0..1 pulls the two chromatids apart; o.color
+    K.seed('chrom' + x.toFixed(0) + y);
+    const sp = K.clamp(o.split || 0), c = o.color || 'pink';
+    for (const d of [-1, 1]) {
+      const cx = x + d * (4 + sp * 46) * s, bend = sp * 14 * s;
+      K.shape(ctx, K.capsule([[cx - d * 16 * s + d * bend, y - 34 * s], [cx, y], [cx - d * 16 * s + d * bend, y + 34 * s]], 13 * s, 11 * s), fillT(c, s, { layers: [{ color: col(c) }, { color: C.white, angle: 0, gap: 7, alpha: .35 }] }));
+    }
+    if (sp < .2) K.dot(ctx, x, y, 6 * s, C.violet, { w: TW('detail') });
+  };
+  P.microscope = (ctx, x, y, s = 1, o = {}) => {          // y = the table, x = the middle of the foot
+    K.seed('micro' + x.toFixed(0) + y);
+    K.shape(ctx, K.rounded([[x - 50 * s, y - 16 * s], [x + 40 * s, y - 16 * s], [x + 44 * s, y], [x - 54 * s, y], [x - 50 * s, y - 16 * s]], 6 * s), deep('navy', s));
+    K.shape(ctx, K.capsule(K.qbez([x - 30 * s, y - 16 * s], [x - 50 * s, y - 90 * s], [x - 12 * s, y - 150 * s], 10), 18 * s, 14 * s), deep('grey', s));
+    K.shape(ctx, K.rect(x - 28 * s, y - 74 * s, 70 * s, 9 * s), fillT('navy', s));
+    P.slide(ctx, x + 6 * s, y - 78 * s, .55 * s, {});
+    K.shape(ctx, K.turn(K.rect(x - 2 * s, y - 160 * s, 22 * s, 66 * s), x + 9 * s, y - 127 * s, .32), deep(o.color || 'white', s, { layers: [{ color: C.sky, alpha: .5 }] }));
+    K.shape(ctx, K.turn(K.rect(x - 24 * s, y - 196 * s, 18 * s, 40 * s), x - 15 * s, y - 176 * s, .32), deep('navy', s));
+    K.shape(ctx, K.rect(x + 14 * s, y - 102 * s, 10 * s, 18 * s), fillT('grey', s * .6));
+    K.dot(ctx, x - 40 * s, y - 80 * s, 9 * s, C.grey, { w: TW('structure', s) });
+  };
+  P.slide = (ctx, x, y, s = 1, o = {}) => {               // a glass slide; x, y = the middle; o.stain colour
+    K.seed('slide' + x.toFixed(0) + y);
+    K.shape(ctx, K.rect(x - 60 * s, y - 9 * s, 120 * s, 18 * s), { fill: C.sky, h: { base: .3, gap: 4, solid: C.white }, w: TW('structure', s), stroke: C.blue });
+    K.line(ctx, K.rect(x - 20 * s, y - 8 * s, 40 * s, 16 * s), { closed: true, w: TW('detail'), color: C.blueL, passes: 1 });
+    K.blob(ctx, x, y, 7 * s, col(o.stain) || C.pink, .9);
+  };
+  P.petriDish = (ctx, x, y, r = 60, o = {}) => {          // x, y = the middle; colonies grow with o.p (0..1)
+    K.seed('petri' + x.toFixed(0) + y);
+    const p = K.clamp(o.p ?? .6);
+    K.shape(ctx, K.ell(x, y, r, r * .42, 30), { fill: C.yolk, h: { base: .45, gap: 3.4, solid: C.white, layers: [{ color: C.straw, alpha: .35 }] }, w: TW('structure', r / 50), stroke: C.blue });
+    const n = Math.round(4 + p * 14);
+    for (let i = 0; i < n; i++) { const a = K.rnd(0, TAU), d = Math.sqrt(K.rnd(0, 1)) * .8; K.dot(ctx, x + Math.cos(a) * r * d, y + Math.sin(a) * r * .42 * d, K.rnd(2, 6) * (r / 60) * (.5 + p * .7), K.pick([C.pink, C.green, C.white, C.orange]), { w: TW('detail') }); }
+    K.line(ctx, K.ell(x, y - 6 * r / 60, r * 1.02, r * .44, 30), { closed: true, w: TW('detail'), color: C.blueL, passes: 1 });
+  };
+
+  /* ================= space ================= */
+  P.rocket = (ctx, x, y, s = 1, o = {}) => {              // y = the bottom of the core, x = the middle; o.booster (default on), o.sep 0..1 drops them, o.fire, o.t
+    K.seed('rocket' + x.toFixed(0) + y);
+    const t = o.t || 0, sep = K.clamp(o.sep || 0), c = o.color || 'red';
+    const fire = (fx, fy, k) => { if (!o.fire) return; K.seed('rfire' + K.S.boil + fx.toFixed(0)); for (let i = 0; i < 3; i++) P.flame(ctx, fx - 8 * s * k + i * 8 * s * k, fy + 50 * s * k, (60 + i % 2 * 20) * s * k, 14 * s * k, t, i + fx); };
+    if (o.booster !== false) for (const d of [-1, 1]) {
+      const bx = x + d * (34 + sep * 60) * s, by = y + sep * sep * 160 * s, a = d * sep * .5;
+      ctx.save(); ctx.translate(bx, by - 60 * s); ctx.rotate(a); ctx.translate(-bx, -(by - 60 * s));
+      if (sep < .1) fire(bx, by, .7);
+      K.shape(ctx, K.rect(bx - 12 * s, by - 140 * s, 24 * s, 136 * s), deep('white', s, { layers: [{ color: C.sky, alpha: .5 }] }));
+      K.shape(ctx, [[bx - 12 * s, by - 140 * s], [bx, by - 172 * s], [bx + 12 * s, by - 140 * s]], deep(c, s));
+      K.shape(ctx, [[bx - 14 * s, by - 4 * s], [bx + 14 * s, by - 4 * s], [bx + 10 * s, by + 8 * s], [bx - 10 * s, by + 8 * s]], fillT('grey', s * .6));
+      ctx.restore();
+    }
+    fire(x, y, 1);
+    for (const d of [-1, 1]) K.shape(ctx, [[x + d * 22 * s, y - 70 * s], [x + d * 44 * s, y - 10 * s], [x + d * 44 * s, y + 6 * s], [x + d * 22 * s, y - 14 * s]], deep(c, s));
+    K.shape(ctx, K.rect(x - 22 * s, y - 230 * s, 44 * s, 226 * s), deep('white', s, { layers: [{ color: C.sky, alpha: .45 }] }));
+    K.hatch(ctx, K.rect(x - 22 * s, y - 120 * s, 44 * s, 14 * s), { color: col(c), base: .9, gap: 2.4 });
+    K.shape(ctx, K.smooth([[x - 22 * s, y - 230 * s], [x - 16 * s, y - 270 * s], [x, y - 296 * s], [x + 16 * s, y - 270 * s], [x + 22 * s, y - 230 * s]], 1, false).concat([[x + 22 * s, y - 230 * s]]), deep(c, s));
+    K.shape(ctx, K.ell(x, y - 190 * s, 11 * s, 11 * s, 16), fillT('sky', s * .5, { layers: [{ color: C.blueL }] }));
+    K.shape(ctx, [[x - 18 * s, y - 4 * s], [x + 18 * s, y - 4 * s], [x + 14 * s, y + 12 * s], [x - 14 * s, y + 12 * s]], fillT('grey', s * .6));
+    if (o.fire && o.smoke !== false) for (let k = 0; k < 4; k++) P.puff(ctx, x + (k - 1.5) * 50 * s, y + 70 * s, 70 * s, t, k);
+  };
+  P.launchTower = (ctx, x, y, s = 1, o = {}) => {         // a launch tower; y = the ground; arms reach toward +f and swing away with o.arms 0..1
+    K.seed('ltower' + x.toFixed(0) + y);
+    const h = (o.h || 320) * s, w = 26 * s, f = o.f || 1, rel = K.clamp(o.arms || 0);
+    for (const d of [-1, 1]) K.line(ctx, [[x + d * w, y], [x + d * w, y - h]], { w: TW('outline', s), color: C.red });
+    for (let yy = y; yy > y - h + 10 * s; yy -= 30 * s) { K.line(ctx, [[x - w, yy], [x + w, yy - 30 * s]], { w: TW('detail'), color: C.redD, passes: 1 }); K.line(ctx, [[x - w, yy], [x + w, yy]], { w: TW('structure', s), color: C.red, passes: 1 }); }
+    for (const [k, len] of [[.45, 70], [.78, 56]]) {
+      const ay = y - h * k, a = -f * rel * 1.2, end = [x + f * w + Math.cos(a) * len * s * f, ay + Math.sin(a) * len * s * (f > 0 ? 1 : -1)];
+      K.shape(ctx, K.capsule([[x + f * w, ay], end], 10 * s), deep('grey', s));
+    }
+    K.shape(ctx, K.rect(x - w - 6 * s, y - h - 12 * s, 2 * w + 12 * s, 12 * s), deep('grey', s));
+    K.blob(ctx, x, y - h - 18 * s, 6 * s, Math.sin((o.t || 0) * 4) > 0 ? C.red : C.rose, 1);
+  };
+
   /* ================= crowds and patterns ================= */
   const CROWD = [['customer', {}], ['office', { build: 'stout' }], ['schoolkid', {}], ['grandma', { build: 'elder' }], ['student', { build: 'teen', hair: 'spiky' }], ['courier', {}], ['artist', {}], ['coder', { build: 'slim' }], ['cashier', { apron: false, hair: 'curly' }], ['teen', {}]];
   const crowdOf = i => Object.assign({}, K.outfits[CROWD[i % CROWD.length][0]], CROWD[i % CROWD.length][1]);
@@ -978,7 +1188,6 @@
   P.who = (ctx, kind, poseName, x, y, s = 1, f = 1, extra = {}) => {
     const look = Object.assign({}, typeof kind === 'object' ? kind : (K.outfits[kind] || {}), extra);
     const joints = K.pose[poseName || 'stand'](x, y, s, f, look);
-    P.person(ctx, joints, Object.assign(look, { t: extra.t }));
-    return joints;
+    return P.person(ctx, joints, Object.assign(look, { t: extra.t })) || joints;
   };
 })();

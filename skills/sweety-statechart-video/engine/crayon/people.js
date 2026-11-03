@@ -46,14 +46,14 @@
   }
 
   /* ---------------- builds: age (size, head) and body (widths) ---------------- */
-  const AGES = { adult: { g: 1, head: 1, limb: 1 }, kid: { g: .7, head: 1.42, limb: 1.12, leg: .74, trunk: .86 }, teen: { g: .88, head: 1.08, limb: .92, leg: .96 }, elder: { g: .94, head: 1, limb: 1, stoop: 1 } };
+  const AGES = { adult: { g: 1, head: 1, limb: 1 }, kid: { g: .7, head: 1.42, limb: 1.12, leg: .74, trunk: .86 }, teen: { g: .88, head: 1.08, limb: .92, leg: .96 }, elder: { g: .94, head: 1, limb: 1, stoop: 1 }, chibi: { g: 1, head: 1, limb: 1, chibi: 1 } };
   const BODIES = { mid: { torso: 1, hip: 1, limb: 1 }, slim: { torso: .82, hip: .8, limb: .82 }, stout: { torso: 1.18, hip: 1.5, limb: 1.2, belly: 1 } };
   function buildOf(b) {
     const words = Array.isArray(b) ? b : String(b || '').split(/[\s,+]+/);
     let age = 'adult', body = 'mid';
     for (const w of words) { if (AGES[w]) age = w; else if (BODIES[w]) body = w; }
     const A = AGES[age], B = BODIES[body];
-    return { age, body, g: A.g, head: A.head, leg: A.leg || 1, trunk: A.trunk || 1, limb: A.limb * B.limb, torso: B.torso * (age === 'kid' ? 1.08 : 1), hip: B.hip * (age === 'kid' ? 1.05 : 1), belly: !!B.belly, stoop: !!A.stoop, key: age + ' ' + body };
+    return { age, body, g: A.g, head: A.head, leg: A.leg || 1, trunk: A.trunk || 1, limb: A.limb * B.limb, torso: B.torso * (age === 'kid' ? 1.08 : 1), hip: B.hip * (age === 'kid' ? 1.05 : 1), belly: !!B.belly, stoop: !!A.stoop, chibi: !!A.chibi, key: age + ' ' + body };
   }
   const JOINTS = ['head', 'neck', 'hip', 'elB', 'haB', 'elF', 'haF', 'knB', 'ftB', 'knF', 'ftF'];
   // scale a pose about its foot (or seat) point for the age; lift a bigger head; an elder stoops a little
@@ -214,14 +214,141 @@
     if (mood === 'proud') K.props.sparkle && K.props.sparkle(ctx, x + f * r * 1.5, y - r * 1.2, r * .55, t, C.straw);
   }
 
+  /* ---------------- chibi: a big round head (a third of the height), a short body, facing us ---------------- */
+  // look: o.look 'pencil' (or a pencil theme) draws a thin dark outline over soft pastel fills; otherwise crayon.
+  // Widths come from K.tier and colours from the palette, so a theme restyles it.
+  function pencilLook(o) { return o.look === 'pencil' || (o.look == null && (K.S.look === 'pencil' || K.S.theme === 'pencil' || !!(K.theme && (K.theme === 'pencil' || K.theme.name === 'pencil' || K.theme.look === 'pencil')))); }
+  function chibiStyle(o, s) {
+    const T = K.tier || { outline: 3.2, structure: 2, detail: 1.2 }, k = Math.max(.8, Math.min(1.25, Math.sqrt(s)));
+    return pencilLook(o) ? { w: T.detail * 1.15 * k, base: .42, gap: 4.4, hw: 1, amp: .55, layer: .3 } : { w: T.outline * .78 * k, base: .78, gap: 2.8, hw: undefined, amp: 1, layer: .7 };
+  }
+  // arms in chibi units from the shoulder: [elbow, hand] for the near (d = 1) and far (d = -1) sides; d flips with facing
+  function chibiArm(kind, d, t) {
+    const near = d > 0, sw = Math.sin((t || 0) * 2.2);
+    const std = [[30, 26], [31, 48]];
+    switch (kind) {
+      case 'hold': return [[30, 24], [10, 32]];
+      case 'carry': return [[28, 22], [14, 14]];
+      case 'sleep': return [[26, 26], [6, 30]];
+      case 'type': case 'stir': { const j = Math.sin((t || 0) * (kind === 'type' ? 14 : 4) + d) * 3; return [[30, 26], [14 + j, 36]]; }
+      case 'up': case 'cheer': { const b = kind === 'cheer' ? Math.abs(Math.sin((t || 0) * 6)) * 8 : 0; return [[34, -22], [40, -48 - b]]; }
+      case 'hips': return [[40, 22], [22, 42]];
+      case 'shrug': { const b = Math.abs(Math.sin((t || 0) * 3)) * 4; return [[40, 10 - b], [46, -14 - b]]; }
+      case 'clap': { const g = (1 + Math.sin((t || 0) * 11)) * 8; return [[30, 22], [4 + g, 10]]; }
+      case 'wave': if (!near) return std; { const w = Math.sin((t || 0) * 7) * 6; return [[38, -18], [44 + w, -46]]; }
+      case 'give': case 'reach': if (!near) return [[30, 24], [12, 32]]; return [[44, 4], [66, 10]];
+      case 'phone': if (!near) return std; return [[30, 24], [8, 8]];
+      case 'toss': case 'shake': { if (!near) return [[28, 22], [6, 20]]; const j = Math.sin((t || 0) * 16) * 5; return [[34, 10], [30 + j, -20]]; }
+      case 'swing': return [[30 + sw * 6 * d, 26], [31 + sw * 14 * d, 48]];
+      default: return std;
+    }
+  }
+  function chibi(ctx, P, o) {
+    const s = P.s || 1, f = P.f || 1, t = o.t || 0, S = chibiStyle(o, s), k = s * .82;   // a chibi at s = 1 is about 150 units tall
+    const floor = Math.max(P.ftB ? P.ftB[1] : P.hip[1], P.ftF ? P.ftF[1] : P.hip[1]);
+    const seated = floor - P.hip[1] < 95 * s, x = P.hip[0];
+    const hipY = seated ? P.hip[1] : floor - 52 * k, bob = seated ? 0 : Math.sin(t * 2.4) * 1.2 * k;
+    const sy = hipY - 52 * k + bob, headC = [x + f * 2 * k, sy - 38 * k], R = 34 * k;
+    const ink = C.ink, skin = col(o.skin) || C.skin, shirt = o.shirt || 'sky', pants = col(o.pants) || C.navy;
+    const fill = (c, more = {}) => Object.assign({ fill: col(c) || c, h: { gap: S.gap, base: S.base, solid: C.white, w: S.hw, layers: [{ color: col(c) || c, alpha: S.layer }] }, w: S.w, amp: S.amp, stroke: ink }, more);
+    K.seed('chibi' + (o.id || '') + x.toFixed(0) + floor.toFixed(0));
+    const W = (lx, ly) => [x + lx * k, ly];
+    // legs and shoes (seated: short legs hang from the seat)
+    const fs = [P.ftB || [x - 9 * s, floor], P.ftF || [x + 11 * s, floor]].sort((a, b) => a[0] - b[0]);
+    const legs = seated ? [[-10, -14, Math.min(floor, hipY + 40 * k)], [10, 14, Math.min(floor, hipY + 40 * k)]]
+      : [[-10, -11 + ((fs[0][0] - x) / k + 11) * .6, fs[0][1] - 6 * k], [10, 11 + ((fs[1][0] - x) / k - 11) * .6, fs[1][1] - 6 * k]];
+    for (const [hx, lf, fy] of legs) {
+      K.shape(ctx, K.capsule([W(hx, hipY), W(lf, fy)], 15 * k, 13 * k), fill(pants === C.navy ? 'navy' : pants, { h: { gap: S.gap, base: S.base + .1, solid: C.white, w: S.hw } }));
+      K.shape(ctx, K.ell(x + (lf + (lf < 0 ? -3 : 3)) * k, fy + 3 * k, 11 * k, 6 * k, 14), fill(o.shoes || 'white', { h: { gap: 3, base: .35, solid: C.white, w: S.hw } }));
+    }
+    // arms: far one behind the body, near one in front
+    const kind = o.arms || P.arms || 'stand';
+    const armAt = (d) => {
+      const sh = [x + d * f * 21 * k, sy + 6 * k];
+      let [el, ha] = chibiArm(kind, d, t).map(([ax, ay]) => [sh[0] + d * f * (ax - 21) * k, sh[1] + ay * k - 6 * k]);
+      const tg = o.target || P.target;
+      if (kind === 'point' && d > 0 && tg) { let dx = tg[0] - sh[0], dy = tg[1] - sh[1]; const dd = Math.hypot(dx, dy) || 1; dx /= dd; dy /= dd; el = [sh[0] + dx * 26 * k, sh[1] + dy * 26 * k + 3 * k]; ha = [sh[0] + dx * 52 * k, sh[1] + dy * 52 * k]; }
+      else if (kind === 'point' && d > 0) { el = [sh[0] + f * 24 * k, sh[1] - 4 * k]; ha = [sh[0] + f * 50 * k, sh[1] - 12 * k]; }
+      return { sh, el, ha };
+    };
+    const arm = (A, front) => {
+      K.shape(ctx, K.capsule([A.sh, A.el, A.ha], 10 * k, 9 * k), fill(o.sleeveless ? (o.skin || 'skin') : 'skin', { h: { gap: 3.4, base: S.base * .8, solid: C.white, w: S.hw } }));
+      if (!o.sleeveless) { const se = [A.sh[0] + (A.el[0] - A.sh[0]) * .7, A.sh[1] + (A.el[1] - A.sh[1]) * .7]; const sl = K.capsule([A.sh, se], 13 * k, 12 * k); cloth(ctx, sl, shirt, k * .9, o.shirtColor); K.line(ctx, sl, { closed: true, w: S.w, color: ink, amp: S.amp }); }
+      if (front && o.holdF) o.holdF(A.ha); if (!front && o.holdB) o.holdB(A.ha);
+      K.shape(ctx, K.ell(A.ha[0], A.ha[1], 7.5 * k, 7 * k, 12), fill(o.gloves ? (o.gloves === true ? 'blue' : o.gloves) : 'skin', { h: { gap: 3, base: S.base * .8, solid: C.white, w: S.hw } }));
+    };
+    const far = armAt(-1), near = armAt(1);
+    if (o.backpack) K.shape(ctx, K.rounded([[x - 24 * k, sy + 4 * k], [x + 24 * k, sy + 4 * k], [x + 26 * k, hipY], [x - 26 * k, hipY], [x - 24 * k, sy + 4 * k]], 10 * k), fill(o.backpack === true ? 'red' : o.backpack));
+    arm(far, false);
+    // the body: a short rounded shirt
+    const torso = K.smooth([[x - 20 * k, sy], [x + 20 * k, sy], [x + 23 * k, hipY - 14 * k], [x + 21 * k, hipY + 4 * k], [x - 21 * k, hipY + 4 * k], [x - 23 * k, hipY - 14 * k]], 2, true);
+    cloth(ctx, torso, shirt, k, o.shirtColor);
+    K.line(ctx, torso, { closed: true, w: S.w, color: ink, amp: S.amp });
+    if (o.apron) { const ap = K.smooth([[x - 14 * k, sy + 10 * k], [x + 14 * k, sy + 10 * k], [x + 18 * k, hipY + 10 * k], [x - 18 * k, hipY + 10 * k]], 1, true); K.shape(ctx, ap, fill(o.apron)); for (const d of [-1, 1]) K.line(ctx, [[x + d * 14 * k, sy + 10 * k], [x + d * 10 * k, sy - 2 * k]], { w: S.w * .7, color: ink, passes: 1 }); }
+    if (o.tie) K.shape(ctx, [[x - 3 * k, sy + 2 * k], [x + 3 * k, sy + 2 * k], [x + 5 * k, sy + 28 * k], [x, sy + 34 * k], [x - 5 * k, sy + 28 * k]], fill(o.tie === true ? 'red' : o.tie));
+    if (o.scarf) K.shape(ctx, K.capsule([[x - 18 * k, sy + 2 * k], [x + 18 * k, sy + 2 * k]], 10 * k), fill(o.scarf === true ? 'red' : o.scarf));
+    if (o.bag) { K.line(ctx, [[x - f * 16 * k, sy + 2 * k], [x + f * 18 * k, hipY - 6 * k]], { w: 3 * k, color: C.brown, passes: 1 }); K.shape(ctx, K.rect(x + f * 18 * k - 12 * k, hipY - 12 * k, 24 * k, 18 * k), fill(o.bag === true ? 'tan' : o.bag)); }
+    if (o.logo) K.text(ctx, o.logo, x, (sy + hipY) / 2 + 6 * k, { font: `${Math.round(13 * k)}px ${K.FONT.type}`, align: 'center', color: C.navy });
+    if (o.badge) K.shape(ctx, K.rect(x - f * 12 * k - 6 * k, sy + 14 * k, 12 * k, 9 * k), fill('white'));
+    // the head: hair behind, face, eyes, cheeks, fringe, bun or hat
+    const [hx, hy] = headC, hc = col(o.hairColor) || C.navy, style = o.hair || 'bun';
+    const hairFill = { fill: hc, h: { gap: 2.2, base: .9, solid: hc, w: S.hw }, w: S.w, amp: S.amp, stroke: ink };
+    if (['bob', 'long', 'pigtails', 'ponytail'].includes(style)) {
+      const down = style === 'long' ? 1.25 : style === 'bob' ? .55 : .2;
+      K.shape(ctx, K.smooth([[hx - R * 1.08, hy + R * down], [hx - R * 1.12, hy - R * .2], [hx - R * .7, hy - R * 1.05], [hx, hy - R * 1.12], [hx + R * .7, hy - R * 1.05], [hx + R * 1.12, hy - R * .2], [hx + R * 1.08, hy + R * down], [hx + R * .8, hy + R * (down + .1)], [hx - R * .8, hy + R * (down + .1)]], 2, true), hairFill);
+      if (style === 'pigtails') for (const d of [-1, 1]) K.shape(ctx, K.ell(hx + d * R * 1.15, hy + R * .25, R * .3, R * .42, 14), hairFill);
+      if (style === 'ponytail') K.shape(ctx, K.capsule([[hx - f * R * .9, hy - R * .3], [hx - f * R * 1.3, hy + R * .5], [hx - f * R * 1.1, hy + R * 1.1]], R * .4, R * .2), hairFill);
+    }
+    K.shape(ctx, K.ell(hx, hy, R, R * .97, 30), fill(o.skin || 'skin', { h: { gap: 3.4, base: pencilLook(o) ? .25 : .45, solid: C.white, w: S.hw, layers: [{ color: skin, alpha: .25 }] } }));
+    const mood = o.face || (o.sad ? 'worried' : 'neutral'), look = f * 3 * k, ey = hy + 1 * k, ex = 11 * k, dw = Math.max(1.4, S.w * .8);
+    const blink = o.t != null && ((t * .7 + (o.blinkPhase || 0)) % 3.1) < .12;
+    for (const d of [-1, 1]) K.blob(ctx, hx + d * 20 * k + look, hy + 11 * k, 6 * k, C.rose, pencilLook(o) ? .55 : .85);
+    for (const d of [-1, 1]) {
+      const e = [hx + d * ex + look, ey];
+      if (mood === 'happy' || mood === 'proud') K.line(ctx, K.qbez([e[0] - 4 * k, e[1] + 1 * k], [e[0], e[1] - 5 * k], [e[0] + 4 * k, e[1] + 1 * k], 5), { w: dw, color: ink, passes: 1 });
+      else if (mood === 'sleepy' || blink) K.line(ctx, K.qbez([e[0] - 4 * k, e[1]], [e[0], e[1] + (mood === 'sleepy' ? 3 : 0) * k], [e[0] + 4 * k, e[1]], 5), { w: dw, color: ink, passes: 1 });
+      else K.dot(ctx, e[0], e[1], (mood === 'surprised' ? 3.6 : 2.8) * k, ink, { w: 1, stroke: null, h: { base: 1, gap: 1.5 } });
+      const bi = mood === 'angry' ? [-8, 2] : mood === 'worried' ? [2, -6] : mood === 'surprised' ? [-9, -9] : null;
+      if (bi) K.line(ctx, [[e[0] - d * 5 * k, ey - 8 * k + bi[0] * k * .3 - 2 * k], [e[0] + d * 5 * k, ey - 8 * k + bi[1] * k * .3 - 2 * k]], { w: dw, color: ink, passes: 1 });
+    }
+    const my = hy + 14 * k, mx = hx + look, open = o.mouth != null ? K.clamp(o.mouth) : o.talk ? Math.abs(Math.sin(o.talk * 9)) : mood === 'surprised' ? .6 : 0;
+    if (o.mask) K.shape(ctx, K.rounded([[mx - 13 * k, my - 7 * k], [mx + 13 * k, my - 7 * k], [mx + 12 * k, my + 9 * k], [mx - 12 * k, my + 9 * k], [mx - 13 * k, my - 7 * k]], 4 * k), fill('white'));
+    else if (open > .15) K.shape(ctx, K.ell(mx, my + 1 * k, 3.6 * k, (2 + 4 * open) * k, 10), { fill: C.red, h: { base: .9, gap: 2 }, w: 1.2, stroke: C.redD });
+    else if (mood === 'happy' || mood === 'proud') K.line(ctx, K.qbez([mx - 4 * k, my], [mx, my + 4 * k], [mx + 4 * k, my], 5), { w: dw, color: C.redD, passes: 1 });
+    else if (mood === 'worried' || mood === 'angry') K.line(ctx, K.qbez([mx - 4 * k, my + 2 * k], [mx, my - 1.5 * k], [mx + 4 * k, my + 2 * k], 5), { w: dw, color: C.redD, passes: 1 });
+    else K.line(ctx, [[mx - 2.5 * k, my + 1 * k], [mx + 2.5 * k, my + 1 * k]], { w: dw, color: C.redD, passes: 1 });
+    if (o.glasses) for (const d of [-1, 1]) K.line(ctx, K.ell(hx + d * ex + look, ey, 7 * k, 6 * k, 14), { closed: true, w: S.w * .7, color: ink, passes: 1 });
+    if (style !== 'bald') {
+      const top = K.ell(hx, hy, R * 1.03, R * 1.0, 26, PI + .18, TAU - .18), fr = [];
+      const n = style === 'spiky' ? 9 : 5;
+      for (let i = 0; i <= n; i++) { const u = i / n, fx = hx + R * (.98 - 1.96 * u), wave = (i % 2 ? .16 : .3) * (style === 'side' ? (u < .35 ? .4 : 1.6) : 1); fr.push([fx, hy - R * wave - (style === 'buzz' ? R * .35 : 0)]); }
+      K.shape(ctx, top.concat(fr), hairFill);
+      if (style === 'bun') K.shape(ctx, K.ell(hx + 2 * k, hy - R * 1.22, R * .38, R * .34, 16), hairFill);
+      if (style === 'curly' || style === 'afro') for (let i = 0; i < 7; i++) { const a = PI * (1.05 + i * .15); K.dot(ctx, hx + Math.cos(a) * R * 1.05, hy + Math.sin(a) * R * 1.02, R * .2, hc, { w: S.w * .8, stroke: ink }); }
+    }
+    if (o.hat === 'cap') {
+      const c = col(o.hatColor) || C.red;
+      K.shape(ctx, K.ell(hx, hy - R * .2, R * 1.04, R * .9, 24, PI + .05, TAU - .05).concat([[hx + R * 1.04, hy - R * .22], [hx - R * 1.04, hy - R * .22]]), fill(c));
+      K.shape(ctx, K.smooth([[hx + f * R * .1, hy - R * .3], [hx + f * R * 1.55, hy - R * .26], [hx + f * R * 1.5, hy - R * .1], [hx + f * R * .1, hy - R * .12]], 1, true), fill(c, { h: { gap: 2.4, base: .9, solid: C.white, w: S.hw } }));
+    } else if (o.hat) hat(ctx, o.hat, hx, hy + R * .12, R * .95, f, 0, o);
+    const J = Object.assign({}, P, { head: headC, neck: [x, sy], hip: [x, hipY], haF: near.ha, elF: near.el, haB: far.ha, elB: far.el, chibi: true });
+    arm(near, true);
+    if (mood === 'sleepy' && o.t != null) for (let i = 0; i < 2; i++) { const d = ((t * .5 + i * .5) % 1); ctx.save(); ctx.globalAlpha = Math.sin(d * PI); K.text(ctx, 'z', hx + f * R * (1 + d * .8), hy - R * (1 + d * 1.2), { font: `${Math.round(R * (.5 + d * .4))}px ${K.FONT.type}`, color: ink, align: 'center' }); ctx.restore(); }
+    if (mood === 'proud' && K.props.sparkle) K.props.sparkle(ctx, hx + f * R * 1.3, hy - R * 1.1, R * .4, t, C.straw);
+    if (mood === 'worried') K.blob(ctx, hx - f * R * .85, hy - R * .45, R * .1, C.sky, 1);
+    if (o.over) o.over(J);
+    return J;
+  }
+
   /* ---------------- the person ---------------- */
   function person(ctx, P, o = {}) {
     const B = buildOf(o.build || P.build);
+    if (B.chibi) return chibi(ctx, P, o);
     if (!P.built && B.key !== 'adult mid') {           // joints made without the build: apply it about the feet
       const fy = Math.max(P.ftB ? P.ftB[1] : P.hip[1], P.ftF ? P.ftF[1] : P.hip[1]);
       P = applyBuild(Object.assign({}, P), P.hip[0], fy, o.build);
     }
-    const s = P.s || 1, f = P.f || 1, r = 15 * s * B.head, lw = Math.max(1, Math.sqrt(s));
+    const s = P.s || 1, f = P.f || 1, r = 15 * s * B.head, lw = Math.max(1, Math.sqrt(s)) * (K.tier ? K.tier.outline / 3.2 : 1) * (pencilLook(o) ? .55 : 1);
     const N = P.neck, Hp = P.hip, L = B.limb, Tw = B.torso, Hw = B.hip;
     let vx = Hp[0] - N[0], vy = Hp[1] - N[1]; const vl = Math.hypot(vx, vy) || 1; vx /= vl; vy /= vl;
     const px = -vy, py = vx, sh = [N[0] + vx * 7 * s, N[1] + vy * 7 * s];
@@ -333,6 +460,7 @@
     }
   }
   function finish(J, x, y, o) {
+    J.arms = o.arms; J.target = o.target; J.t = o.t;
     if (o.arms === 'sleep') { J.head = [J.head[0] + J.f * 7 * J.s, J.head[1] + 6 * J.s]; J.tilt = (J.tilt || 0) + .3 * J.f; }
     return applyBuild(J, x, y, o.build);
   }
@@ -404,6 +532,9 @@
     porter: { shirt: 'tan', pants: 'navy', hat: 'bandana', hatColor: 'blue', hair: 'short', sleeveless: true },
   };
 
-  K.pose = pose; K.outfits = outfits; K.people = { buildOf, applyBuild, armsFor };
+  outfits.barista = { build: 'chibi', shirt: 'sky', pants: 'navy', hair: 'bun', apron: 'green' };
+  outfits.boba = { build: 'chibi', shirt: 'white', pants: 'navy', hair: 'short', hat: 'cap', hatColor: 'rose', apron: 'rose' };
+  outfits.chibi = { build: 'chibi', shirt: 'mint', pants: 'navy', hair: 'bun' };
+  K.pose = pose; K.outfits = outfits; K.people = { buildOf, applyBuild, armsFor, chibi, pencilLook };
   K.props = Object.assign(K.props || {}, { person, face, hat, cloth, flower });
 })();

@@ -149,6 +149,26 @@ GALLERY_JS = r"""
       keyboard: [1.2, (P, g, t) => P.keyboard(g, 0, -40, 1, { t, typing: true })],
       queue: [.6, (P, g, t) => P.queue(g, 150, 0, 4, { t, f: 1 })],
       ring: [.55, (P, g, t) => P.ring(g, 0, -20, 7, { t, r: 150 })],
+      bubbleTea: [1.3, (P, g, t) => { P.bubbleTea(g, -40, -10, 1, { tea: 'tan', tiger: true, t }); P.bubbleTea(g, 40, -10, 1, { tea: 'lilac', t }); }],
+      shaker: [1.4, (P, g, t) => P.shaker(g, 0, -10, 1, { shake: true, t })],
+      register: [1.2, (P, g) => P.register(g, 0, -20, 1, { price: '¥12', open: .6 })],
+      coins: [2, (P, g) => P.coins(g, 0, -20, 1, { n: 4 })],
+      bell: [1.8, (P, g, t) => P.bell(g, 0, -20, 1, { ring: true, t })],
+      pager: [2, (P, g, t) => P.pager(g, 0, -30, 1, { buzz: true, t, num: '42' })],
+      pearlPot: [1.2, (P, g, t) => P.pearlPot(g, 0, -10, 1, { t })],
+      menuBoard: [.75, (P, g) => P.menuBoard(g, -140, -190, 280, 140, {})],
+      pearlJar: [1.5, (P, g) => P.pearlJar(g, 0, -10, 1, { label: 'old', n: 6 })],
+      soldOutJar: [1.4, (P, g) => P.soldOutJar(g, -20, -10, 1, {})],
+      hourglass: [1.4, (P, g, t) => P.hourglass(g, 0, -80, 1, t, { p: .35 })],
+      ladybug: [3, (P, g, t) => P.ladybug(g, 0, -20, 1, t)],
+      cell: [.9, (P, g, t) => { P.cell(g, -100, -100, 34, { p: 0, t }); P.cell(g, 0, -100, 34, { p: .55, t }); P.cell(g, 100, -40, 34, { p: 1, t }); }],
+      dna: [1, (P, g, t) => P.dna(g, 0, -200, 190, { t })],
+      chromosome: [1.4, (P, g) => { P.chromosome(g, -50, -70, 1, {}); P.chromosome(g, 40, -70, .8, { split: .6, color: 'blue' }); }],
+      microscope: [1, (P, g) => P.microscope(g, 0, -10, 1)],
+      slide: [1.4, (P, g) => P.slide(g, 0, -60, 1, {})],
+      petriDish: [1.4, (P, g, t) => P.petriDish(g, 0, -60, 70, { p: .7, t })],
+      rocket: [.6, (P, g, t) => { P.rocket(g, -80, -80, 1, { t, fire: true }); P.rocket(g, 100, -80, .8, { t, sep: .5, fire: true, smoke: false }); }],
+      launchTower: [.6, (P, g, t) => P.launchTower(g, 0, -10, 1, { arms: .3, t })],
       repeat: [.8, (P, g, t) => P.repeat(g, (x, y, i) => P.bowl(g, x, y, .5, { food: i % 2 ? 'rice' : 'noodles' }), { x0: -150, y0: -150, x1: 150, y1: 0 }, { cols: 4, rows: 3, jitter: .3 })],
     };
 
@@ -179,7 +199,7 @@ GALLERY_JS = r"""
       const untested = names.filter(n => !PROPS[n]);
       return { png: cellSheet(items, 10, 240, 240, `props · ${table.length} · ${untested.length ? 'not in the gallery: ' + untested.join(', ') : 'all shown'}`), untested };
     }
-    const BUILDS = ['kid', 'teen', 'adult', 'elder', 'slim', 'stout', 'elder stout', 'teen stout'];
+    const BUILDS = ['kid', 'teen', 'adult', 'elder', 'slim', 'stout', 'elder stout', 'teen stout', 'chibi'];
     const FACES = ['neutral', 'happy', 'surprised', 'worried', 'sleepy', 'angry', 'proud'];
     const LOOKS = ['customer', 'office', 'cashier', 'student', 'grandma', 'coder', 'farmer', 'doctor'];
     function facesSheet() {
@@ -202,7 +222,8 @@ GALLERY_JS = r"""
         else if (p === 'ride') { P.scooter(g, x0 + 100, y0 + 300, .8, 1, { t: T }); P.who(g, o, 'ride', x0 + 80, y0 + 254, .75, 1, { t: T, bars: [x0 + 148, y0 + 228] }); }
         else P.who(g, o, p, x0 + 80, y0 + 300, .95, 1, { t: T });
       } }));
-      return cellSheet(items, 6, 200, 340, 'people · every arms action and pose');
+      ARMS.forEach(a => items.push({ label: 'chibi ' + a, draw: (g, x0, y0) => { const tg = [x0 + 170, y0 + 90]; if (a === 'point') K.dot(g, tg[0], tg[1], 8, C.red); P.who(g, 'barista', 'stand', x0 + 90, y0 + 300, 1.3, 1, { t: T, arms: a, target: tg }); } }));
+      return cellSheet(items, 6, 200, 340, 'people · every arms action and pose · the same for chibi');
     }
     const HAIR = ['bun', 'short', 'ponytail', 'long', 'bald', 'bob', 'curly', 'afro', 'spiky', 'pigtails', 'buzz', 'side'];
     const HATS = ['conical', 'cap', 'helmet', 'chef', 'beanie', 'headband', 'hardhat', 'beret', 'bandana', 'sunhat', 'nurse', 'grad'];
@@ -213,6 +234,7 @@ GALLERY_JS = r"""
       HATS.forEach(h => items.push({ label: 'hat ' + h, draw: (g, x0, y0) => { P.face(g, x0 + 80, y0 + 150, 42, 1, { hair: 'short', t: T }); P.hat(g, h, x0 + 80, y0 + 150, 42, 1, 0, {}); } }));
       ACC.forEach(([n, o]) => items.push({ label: n, draw: (g, x0, y0) => P.who(g, { shirt: 'sky', pants: 'navy', hair: 'short' }, 'stand', x0 + 80, y0 + 300, .95, 1, Object.assign({ t: T, arms: n === 'cane' ? 'hold' : undefined }, o)) }));
       Object.keys(K.outfits).forEach(n => items.push({ label: 'outfit ' + n, draw: (g, x0, y0) => P.who(g, n, 'stand', x0 + 80, y0 + 300, .95, 1, { t: T }) }));
+      [['chibi barista · pencil', 'barista'], ['chibi boba · pencil', 'boba'], ['chibi · crayon', 'chibi'], ['adult · pencil', 'customer'], ['kid · pencil', 'schoolkid']].forEach(([lab, n], i) => items.push({ label: lab, draw: (g, x0, y0) => P.who(g, n, 'stand', x0 + 80, y0 + 300, n === 'customer' || n === 'schoolkid' ? .95 : 1.3, 1, { t: T, look: lab.includes('pencil') ? 'pencil' : 'crayon', arms: ['shake', 'type', 'wave', 'phone', 'hold'][i], face: ['proud', 'happy', 'neutral', 'happy', 'surprised'][i] }) }));
       items.push({ label: 'hero 1.4 · proud · give', draw: (g, x0, y0) => P.who(g, 'chef', 'stand', x0 + 80, y0 + 330, 1.4 * .72, 1, { t: T, face: 'proud', arms: 'give' }) });
       return cellSheet(items, 8, 170, 330, 'people · hair · hats · accessories · outfits');
     }

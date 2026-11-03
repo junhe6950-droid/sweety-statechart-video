@@ -103,9 +103,9 @@
   function person(g, F, role, def, poseName, x, y, sc, f, more = {}) {
     const look = cast(F, role, def, more);
     const J = K.pose[poseName || 'stand'](x, y, sc * F.s, f, look);
-    P().person(g, J, look);
-    F.at[role] = J;
-    return J;
+    const out = P().person(g, J, look) || J;
+    F.at[role] = out;
+    return out;
   }
 
   /* ---------------- cached static layers ---------------- */
@@ -812,6 +812,69 @@
         if (b1 - b0 > 250 * s) K.line(g, tri, { color: C.white, w: 2.4, passes: 1, closed: true, progress: K.clamp(prog * 1.3 - .2), alpha: .9 });
         if (ask) { const J = F.at.pupil; if (J) P().mark(g, J.head[0] - f * 30 * s, J.head[1] - 40 * s, '?', { pop: K.clamp(F.p * 2), color: 'red' }); }
       }
+    },
+  };
+
+  /* =====================================================================================================
+   * boba: order | make | call
+   * a bubble-tea counter: a cashier at the till, a barista shaking, chibi customers in line (pencil-friendly)
+   * ===================================================================================================== */
+  SETS.boba = {
+    modes: ['order', 'make', 'call'], minW: 440, H0: 400,
+    plan(F) {
+      const s = F.s, f = F.f, c0 = F.X(.42), barista = F.X(.67), cashier = F.X(.9), first = F.X(.31);
+      const n = Math.max(1, Math.min(3, Math.floor(Math.abs(first - F.X(0)) / (70 * s)) + 1));
+      return { c0, barista, cashier, first, n, top: F.Y(66), at: { till: [cashier - f * 30 * s, F.Y(66)], bell: [F.X(.78), F.Y(66)], first: [first, F.gy] } };
+    },
+    key: F => F.is('call') ? 'call' : F.is('make') ? 'make' : '',
+    back(g, F) {
+      const s = F.s, L = F.lay, f = F.f;
+      wash(g, F.bx0, F.Y(400), F.bx1, F.gy, 'cream', { cross: 'peach', base: .34 });
+      const mx = F.X(.03) - (f > 0 ? 0 : 230 * s);
+      const mw = Math.min(230 * s, F.w * .44);
+      P().menuBoard(g, F.f > 0 ? mx : F.X(.03) - mw, F.Y(370), mw, 110 * s, { title: F.st.sign || 'menu', items: F.st.menu || [['珍珠奶茶', '12'], ['黑糖波波', '15'], ['芋泥啵啵', '14']], hang: 30 * s });
+      // a shelf over the counter: the pearl pot, jars, an hourglass
+      const sx0 = Math.min(F.X(.5), F.X(.99)), sx1 = Math.max(F.X(.5), F.X(.99)), sy = F.Y(250);
+      sh(g, K.rect(sx0, sy, sx1 - sx0, 8 * s), 'tan', 'far');
+      for (const x of [sx0 + 16 * s, sx1 - 16 * s]) ln(g, [[x, sy + 8 * s], [x + (x < (sx0 + sx1) / 2 ? 12 : -12) * s, sy + 34 * s]], 'far', { detail: true });
+      P().pearlJar(g, F.X(.92), sy, .62 * s, { label: '珍珠', n: 9 });
+      P().hourglass(g, F.X(.8), sy - 36 * s, .55 * s, 0, { p: .4 });
+      P().pearlPot(g, F.X(.6), sy, .7 * s, { low: F.is('call') });
+      // the people further back in the line
+      for (let i = L.n - 1; i >= 1; i--) {
+        const look = Object.assign({}, K.outfits.chibi, [{ shirt: 'pink', hair: 'bob' }, { shirt: 'sky', hair: 'short' }, { shirt: 'mint', hair: 'bun' }][i % 3], { face: i === L.n - 1 ? 'sleepy' : 'neutral' });
+        const J = K.pose.stand(L.first - f * i * 72 * s, F.gy, 1.2 * s, f, Object.assign({ arms: i === 1 ? 'phone' : 'hold' }, look));
+        const out = P().person(g, J, look);
+        if (i === 1 && out) P().phone(g, out.haF[0], out.haF[1] - 8 * s, .26 * s, { screen: 'pay' });
+      }
+    },
+    mid(g, F) {
+      const s = F.s, L = F.lay, t = F.t, f = F.f, order = F.is('order'), make = F.is('make'), call = F.is('call');
+      person(g, F, 'cashier', 'boba', 'stand', L.cashier, F.gy, 1.25, -f, { arms: order ? 'type' : 'hold', face: order ? 'happy' : 'neutral' });
+      person(g, F, 'hero', 'barista', 'stand', L.barista, F.gy, 1.25, -f, { arms: make ? 'shake' : call ? 'give' : 'hold', face: call ? 'happy' : make ? 'proud' : 'neutral' });
+      person(g, F, 'customer', { ...K.outfits.chibi, shirt: 'straw', hair: 'short' }, 'stand', L.first, F.gy, 1.2, f, { arms: order ? 'point' : call ? 'cheer' : 'hold', target: [F.X(.15), F.Y(330)], face: call ? 'happy' : order ? 'neutral' : 'worried' });
+    },
+    front(g, F) {
+      const s = F.s, L = F.lay, f = F.f;
+      floor(g, F, 'planks', 'creamD');
+      const x0 = Math.min(L.c0, f > 0 ? F.bx1 : F.bx0), x1 = Math.max(L.c0, f > 0 ? F.bx1 : F.bx0), cy = L.top;
+      sh(g, K.rect(x0, cy + 10 * s, x1 - x0, F.gy - cy - 10 * s), 'cream', 'near', { layers: [{ color: C.creamD, alpha: .6 }, { color: C.tan, angle: .3, gap: 10, alpha: .25 }] });
+      for (let x = x0 + 22 * s; x < x1 - 8 * s; x += 26 * s) ln(g, [[x, cy + 16 * s], [x, F.gy - 6 * s]], 'near', { detail: true });
+      sh(g, K.rect(x0 - 6 * s, cy, x1 - x0 + 12 * s, 12 * s), 'tan', 'near', { layers: [{ color: C.ochre, alpha: .6, angle: -.1 }] });
+      P().register(g, L.cashier - f * 34 * s, cy, .62 * s, { price: F.st.price || '¥12', open: F.is('order') ? .6 : 0 });
+      P().coins(g, L.cashier - f * 86 * s, cy, .7 * s, { n: 3 });
+      const cups = F.is('call') ? 3 : F.is('make') ? 2 : 1;
+      for (let i = 0; i < cups; i++) P().bubbleTea(g, L.c0 + f * (26 + i * 40) * s, cy, .56 * s, { tea: ['tan', 'lilac', 'pink'][i], tiger: i === 0 });
+      for (let i = 0; i < 2; i++) P().pager(g, L.c0 + f * (cups * 40 + 30) * s + f * 4 * s * i, cy - i * 10 * s, .45 * s, {});
+    },
+    top(g, F) {
+      const s = F.s, L = F.lay, t = F.t, f = F.f, call = F.is('call'), make = F.is('make');
+      P().steam(g, F.X(.6) - 8 * s, F.Y(250) - 74 * s, t, 1, 44 * s, 4 * s, 'ink'); P().steam(g, F.X(.6) + 8 * s, F.Y(250) - 74 * s, t, 2, 44 * s, 4 * s, 'ink');
+      P().bell(g, L.at.bell[0], L.top, .55 * s, { t, ring: call });
+      const h = F.at.hero;
+      if (make && h) P().shaker(g, h.haF[0], h.haF[1] + 30 * s, .55 * s, { shake: true, t });
+      if (call && h) P().bubbleTea(g, h.haF[0] + f * 4 * s, h.haF[1] + 30 * s, .5 * s, { tea: 'tan', tiger: true });
+      if (call) { const c = F.at.customer; if (c) P().pager(g, c.haF[0], c.haF[1] - 4 * s, .45 * s, { buzz: true, t, num: F.st.num || '42' }); P().bubble(g, (h ? h.head[0] : L.barista) - f * 34 * s, (h ? h.head[1] : F.Y(150)) - 20 * s, F.st.say || '42 号！', { size: Math.round(17 * s), side: f > 0 ? 'right' : 'left', pop: K.clamp(F.p * 2) }); }
     },
   };
 
