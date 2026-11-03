@@ -22,8 +22,8 @@
     if (!f.flow) f.flow = fr < .9 && !f.chapters.some(c => c.regions) ? 'right' : 'down';
     f.W = 1000; f.H = Math.round(1000 * (f.poster ? ratio(f.poster) : f.flow === 'right' ? fr : Math.max(1, fr)));
     f.speed = f.speed || (f.voice === 'none' ? 3 : 2);
-    // phones show a 1080-wide frame at about 0.37x: an upright frame gets larger card and arrow words
-    const upright = fr > 1.1, big = f.text || {};
+    // phones show a 1080-wide frame at about 0.37x: an upright or square frame gets larger card and arrow words
+    const upright = fr >= .95, big = f.text || {};
     f.text = { card: big.card || (upright ? 27 : 23), edge: big.edge || (upright ? 22.5 : 18.5), tag: big.tag || (upright ? 13 : 12) };
     if (K.layout && K.layout.setText) K.layout.setText(f.text);
     f.player = f.player || {};

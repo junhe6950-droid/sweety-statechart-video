@@ -1,0 +1,470 @@
+{
+ "title": "一杯奶茶",
+ "series": "奶茶店的生意",
+ "aspect": "1:1",
+ "voice": "sunny-girl",
+ "theme": "pencil",
+ "chapters": [
+  {
+   "title": "一张单",
+   "sub": "从排队到你手上",
+   "tagline": "an order",
+   "look": "ticket",
+   "arrows": "thread",
+   "states": {
+    "line": {
+     "label": "排队中",
+     "tag": "No. 42"
+    },
+    "ordered": {
+     "label": "已点单",
+     "tag": "No. 42"
+    },
+    "paid": {
+     "label": "已付款",
+     "tag": "No. 42"
+    },
+    "making": {
+     "label": "制作中",
+     "tag": "No. 42"
+    },
+    "refund": {
+     "label": "已退款",
+     "tag": "No. 42",
+     "kind": "error"
+    },
+    "ready": {
+     "label": "可以取了",
+     "tag": "No. 42"
+    },
+    "hand": {
+     "label": "到你手上",
+     "tag": "No. 42",
+     "kind": "final"
+    }
+   },
+   "start": "line",
+   "edges": [
+    {
+     "from": "line",
+     "to": "ordered",
+     "label": "你点单"
+    },
+    {
+     "from": "ordered",
+     "to": "paid",
+     "label": "你付钱"
+    },
+    {
+     "from": "paid",
+     "to": "making",
+     "label": "开做",
+     "if": "还有珍珠"
+    },
+    {
+     "from": "paid",
+     "to": "refund",
+     "label": "退钱",
+     "if": "珍珠卖完了"
+    },
+    {
+     "from": "making",
+     "to": "ready",
+     "label": "叫你的号"
+    },
+    {
+     "from": "ready",
+     "to": "making",
+     "label": "做错了"
+    },
+    {
+     "from": "ready",
+     "to": "hand",
+     "label": "你取走"
+    }
+   ],
+   "steps": [
+    {
+     "go": "start",
+     "note": "你排进队里"
+    },
+    {
+     "go": "line>ordered",
+     "note": "点一杯珍珠奶茶"
+    },
+    {
+     "go": "ordered>paid",
+     "note": "付了钱"
+    },
+    {
+     "go": "paid>making",
+     "note": "还有珍珠，店员开做"
+    },
+    {
+     "go": "making>ready",
+     "note": "叫到你的号"
+    },
+    {
+     "go": "ready>hand",
+     "note": "到你手上"
+    },
+    {
+     "go": "paid>refund",
+     "on": [
+      "refund"
+     ],
+     "note": "要是珍珠卖完了，就退钱"
+    }
+   ]
+  },
+  {
+   "title": "一天",
+   "sub": "早七点到晚九点",
+   "tagline": "a day",
+   "look": "sign",
+   "states": {
+    "closed": {
+     "label": "打烊"
+    },
+    "prep": {
+     "label": "准备中"
+    },
+    "quiet": {
+     "label": "冷清",
+     "look": "note"
+    },
+    "busy": {
+     "label": "忙碌",
+     "look": "note"
+    },
+    "rush": {
+     "label": "高峰",
+     "look": "note"
+    },
+    "cleanup": {
+     "label": "收拾中"
+    }
+   },
+   "start": "closed",
+   "regions": {
+    "id": "open",
+    "look": "shop",
+    "lanes": [
+     {
+      "id": "openlane",
+      "title": "营业中",
+      "states": [
+       "quiet",
+       "busy",
+       "rush"
+      ],
+      "look": "shop"
+     }
+    ]
+   },
+   "edges": [
+    {
+     "from": "closed",
+     "to": "prep",
+     "label": "早上七点"
+    },
+    {
+     "from": "prep",
+     "to": "open",
+     "label": "茶和珍珠备好"
+    },
+    {
+     "from": "quiet",
+     "to": "busy",
+     "label": "来人了"
+    },
+    {
+     "from": "busy",
+     "to": "rush",
+     "label": "放学了"
+    },
+    {
+     "from": "rush",
+     "to": "quiet",
+     "label": "缓下来"
+    },
+    {
+     "from": "quiet",
+     "to": "cleanup",
+     "label": "九点",
+     "if": "没客人"
+    },
+    {
+     "from": "cleanup",
+     "to": "closed",
+     "label": "钱点完了"
+    }
+   ],
+   "steps": [
+    {
+     "go": "start",
+     "note": "早上，店还关着"
+    },
+    {
+     "go": "closed>prep",
+     "note": "七点开始准备"
+    },
+    {
+     "go": "prep>open",
+     "note": "茶和珍珠都好了，开门"
+    },
+    {
+     "go": "quiet>busy",
+     "note": "人多起来"
+    },
+    {
+     "go": "busy>rush",
+     "note": "放学了，最忙的时候"
+    },
+    {
+     "go": "rush>quiet",
+     "note": "慢慢缓下来"
+    },
+    {
+     "go": "quiet>cleanup",
+     "note": "九点没客人，收拾"
+    },
+    {
+     "go": "cleanup>closed",
+     "note": "钱点完，打烊"
+    }
+   ]
+  },
+  {
+   "title": "两边同时",
+   "sub": "店员和那锅珍珠",
+   "tagline": "two at once",
+   "look": "soft",
+   "states": {
+    "free": {
+     "label": "店员空闲"
+    },
+    "mixing": {
+     "label": "做饮品"
+    },
+    "calling": {
+     "label": "叫号"
+    },
+    "full": {
+     "label": "满锅珍珠"
+    },
+    "low": {
+     "label": "快没了"
+    },
+    "cooking": {
+     "label": "煮珍珠"
+    }
+   },
+   "regions": {
+    "id": "both",
+    "title": "同一时间",
+    "lanes": [
+     {
+      "id": "staff",
+      "title": "店员",
+      "states": [
+       "free",
+       "mixing",
+       "calling"
+      ],
+      "tint": "sky"
+     },
+     {
+      "id": "pot",
+      "title": "那锅珍珠",
+      "states": [
+       "full",
+       "low",
+       "cooking"
+      ],
+      "tint": "rose"
+     }
+    ]
+   },
+   "edges": [
+    {
+     "from": "free",
+     "to": "mixing",
+     "label": "来单了",
+     "if": "锅里没在煮",
+     "waits": "pot"
+    },
+    {
+     "from": "mixing",
+     "to": "calling",
+     "label": "摇好封口"
+    },
+    {
+     "from": "calling",
+     "to": "free",
+     "label": "取走了"
+    },
+    {
+     "from": "full",
+     "to": "low",
+     "label": "用得差不多"
+    },
+    {
+     "from": "low",
+     "to": "cooking",
+     "label": "新煮一锅",
+     "if": "店员空闲"
+    },
+    {
+     "from": "cooking",
+     "to": "full",
+     "label": "又有嚼劲了"
+    }
+   ],
+   "steps": [
+    {
+     "go": "start",
+     "note": "店员和锅，各忙各的"
+    },
+    {
+     "go": "free>mixing",
+     "note": "来单了，锅里没在煮"
+    },
+    {
+     "go": "full>low",
+     "note": "珍珠快用完"
+    },
+    {
+     "go": "mixing>calling",
+     "note": "摇好封口，叫号"
+    },
+    {
+     "go": "calling>free",
+     "note": "取走了，店员空下来"
+    },
+    {
+     "go": "low>cooking",
+     "note": "店员空着，新煮一锅"
+    },
+    {
+     "go": "cooking>full",
+     "note": "又是一锅好珍珠"
+    }
+   ]
+  },
+  {
+   "title": "珍珠的毛病",
+   "sub": "检查器找到老珍珠怎么卖出去",
+   "tagline": "the pearl bug",
+   "look": "soft",
+   "states": {
+    "boiled": {
+     "label": "刚煮好"
+    },
+    "chewy": {
+     "label": "有嚼劲"
+    },
+    "firm": {
+     "label": "变硬了"
+    },
+    "old": {
+     "label": "太老了"
+    },
+    "tossed": {
+     "label": "倒掉"
+    },
+    "served": {
+     "label": "老珍珠上桌",
+     "kind": "error"
+    }
+   },
+   "start": "boiled",
+   "rule": {
+    "never": "served",
+    "stamp": "规则被打破",
+    "text": "永远不卖超过四小时的珍珠"
+   },
+   "rules": [
+    {
+     "stuck": false,
+     "text": "店不会卡住"
+    }
+   ],
+   "edges": [
+    {
+     "from": "boiled",
+     "to": "chewy",
+     "label": "过一小时"
+    },
+    {
+     "from": "chewy",
+     "to": "chewy",
+     "label": "又过一小时"
+    },
+    {
+     "from": "chewy",
+     "to": "firm",
+     "label": "过一小时"
+    },
+    {
+     "from": "firm",
+     "to": "old",
+     "label": "过一小时"
+    },
+    {
+     "from": "old",
+     "to": "tossed",
+     "label": "倒掉"
+    },
+    {
+     "from": "tossed",
+     "to": "boiled",
+     "label": "煮新的"
+    },
+    {
+     "from": "old",
+     "to": "served",
+     "label": "照样卖",
+     "if": "正在高峰"
+    }
+   ],
+   "steps": [
+    {
+     "go": "start",
+     "note": "一锅珍珠刚煮好"
+    },
+    {
+     "go": "boiled>chewy",
+     "note": "一小时后，正好吃"
+    },
+    {
+     "go": "chewy>firm",
+     "note": "再一小时，变硬了"
+    },
+    {
+     "go": "firm>old",
+     "note": "四小时，太老了"
+    },
+    {
+     "go": [
+      "old>tossed",
+      "tossed>boiled"
+     ],
+     "note": "本该倒掉，重煮一锅"
+    },
+    {
+     "go": "old>served",
+     "note": "可高峰一忙，照样卖了"
+    },
+    {
+     "trace": true,
+     "note": "检查器顺着红线，找到这条坏路"
+    }
+   ]
+  }
+ ],
+ "duration": [
+  55,
+  75
+ ]
+}

@@ -56,7 +56,7 @@
     // pen and coloured pencil (after Kevin Ngo's "The business of boba"): a thin dark pen line, soft pastel pencil,
     // warm paper, slanted serif words, no crayon wax
     pencil: {
-      name: '钢笔彩铅', paper: 'cream', blend: 'multiply', type: 'pen', stroke: { w: .52, amp: .45, passes: 1 }, fill: { alpha: .72, gap: .78, base: .7 }, inkText: false,
+      name: '钢笔彩铅', paper: 'cream', blend: 'multiply', type: 'pen', airy: true, stroke: { w: .52, amp: .45, passes: 1 }, fill: { alpha: .72, gap: .78, base: .7 }, inkText: false,
       colors: {
         paper: '#f5efe3', ink: '#2f2a2c', inkD: '#2f2a2c', navy: '#2f2a2c', black: '#2f2a2c', title: '#2f2a2c', cardInk: '#2f2a2c',
         pink: '#e0627a', rose: '#f2a7b5', red: '#c4473b', redD: '#a83a30', guard: '#b5453a', active: '#d9576f',
@@ -67,7 +67,7 @@
       },
     },
     // felt patches stitched to linen with gold cord (after Kevin Ngo's "Catch" finale)
-    linen: { name: '亚麻刺绣', paper: 'linen', blend: 'multiply', type: 'fangsong', colors: { paper: '#efe6d4', card: '#fbf5e6', bg: '#d9cdb5' } },
+    linen: { name: '亚麻刺绣', paper: 'linen', blend: 'multiply', type: 'fangsong', airy: true, colors: { paper: '#efe6d4', card: '#fbf5e6', bg: '#d9cdb5' } },
     riso: {
       name: '孔版', paper: 'cream', blend: 'multiply', misreg: 3.2,
       colors: {                                            // three inks (riso blue, fluorescent pink, yellow) and their overprints
@@ -126,7 +126,7 @@
     }
     const colors = Object.assign({}, base.colors, over.colors || {});
     return { name: over.name || base.name, paper: over.paper || base.paper, blend: over.blend || base.blend, type: over.type || base.type || 'serif', misreg: over.misreg ?? base.misreg ?? 0,
-      stroke: Object.assign({}, base.stroke, over.stroke), fill: Object.assign({}, base.fill, over.fill), inkText: over.inkText ?? base.inkText, colors };
+      stroke: Object.assign({}, base.stroke, over.stroke), fill: Object.assign({}, base.fill, over.fill), inkText: over.inkText ?? base.inkText, airy: over.airy ?? base.airy ?? false, colors };
   }
 
   // rewrite K.C in place (every module holds the same object), set the type face and the layer mixing

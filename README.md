@@ -94,7 +94,8 @@ python3 scripts/scv.py voices                     # 列出声音
 
 - `examples/intro/`：《一句话，做一部会动的状态图》，5 章，2 分 10 秒，四个声音轮流出场；
 - `examples/takeout/`：《一份外卖的一生》，4 章，1.5 分钟，蜡笔姐姐；
-- `examples/message/`：《一条消息的旅程》，3 章，1 分钟，图纸哥。
+- `examples/message/`：《一条消息的旅程》，3 章，1 分钟，图纸哥；
+- `examples/boba/`：《一杯奶茶》，4 章，1 分钟，钢笔彩铅主题、方形，四章分别用票据串红线、店面便签、按线着色的两条线、规则图例，对照 statechart-art 的四张海报。
 
 速度：在 M 系列 Mac 上，93 秒的片子渲染约 40 秒，36 句旁白约 3 分钟。
 

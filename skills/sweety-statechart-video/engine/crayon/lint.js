@@ -162,7 +162,10 @@
       const num = ch.num;
       ov.forEach(o => issues.push({ chapter: num, kind: 'overlap', what: o.kind, id: o.id || null, at: o.at, detail: o,
         fix: o.kind === 'card' ? `move the picture near (${o.at}) off card ${o.id}` : o.kind === 'words' ? `keep pictures off the words of ${o.id} (${o.text})` : o.kind === 'arrow' ? `a picture crosses arrow ${o.id} near (${o.at})` : `keep pictures out of the header` }));
-      if (cov.empty > .38) issues.push({ chapter: num, kind: 'empty', share: cov.empty, holes: cov.holes, fix: `${Math.round(cov.empty * 100)}% of the poster is blank paper (aim ≤ 38%): fill ${cov.holes.slice(0, 3).map(h => `[${h.x0},${h.y0}–${h.x1},${h.y1}]`).join(' ')}` });
+      // a dense crayon poster leaves at most 38% blank (the reference measures 34%); an airy pen-and-pencil one about
+      // half (statechart-art's boba plates measure 24–50%)
+      const limit = K.theme && K.theme.current && K.theme.current.airy ? .55 : .38;
+      if (cov.empty > limit) issues.push({ chapter: num, kind: 'empty', share: cov.empty, holes: cov.holes, fix: `${Math.round(cov.empty * 100)}% of the poster is blank paper (aim ≤ ${Math.round(limit * 100)}%): fill ${cov.holes.slice(0, 3).map(h => `[${h.x0},${h.y0}–${h.x1},${h.y1}]`).join(' ')}` });
       if (cov.solid > .08) issues.push({ chapter: num, kind: 'heavy', share: cov.solid, fix: `${Math.round(cov.solid * 100)}% of tiles are heavy dark or saturated blocks (aim ≤ 8%): open up the hatching, lighten big solid fills` });
       if (sp > 1500) issues.push({ chapter: num, kind: 'spill', pixels: sp, fix: 'scene ink beyond the poster edge: pull it inside (bleeding off an edge on purpose is fine for big set pieces)' });
       still.forEach(s => issues.push({ chapter: num, kind: 'still', step: s.step, fix: `step ${num}.${s.step} (${s.note}): the pictures do not change; make the active state show (S.on / S.since)` }));
