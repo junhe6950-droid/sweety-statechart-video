@@ -1,0 +1,61 @@
+/* 格物 · shell.css — the player around the film page (scv.py preview, the HTML export). */
+:root {
+  --paper: #e9e3d6; --card: #f5f1e8; --ink: #2b2622; --ink-2: #6b625a; --rule: #d6cdbd; --pink: #d6336c; --navy: #2140d6;
+  --hand: 'SCV Hand', 'Kaiti SC', 'STKaiti', serif; --mono: 'Courier Prime', ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }        /* the render page says canvas{display:block} */
+html, body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.5 var(--mono); }
+.scv-shell { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; padding: 14px 16px; min-height: 100vh; align-items: start; }
+.scv-stage { position: sticky; top: 14px; display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; }
+.scv-frame { position: relative; line-height: 0; box-shadow: 0 0 0 1px var(--rule), 0 6px 24px rgba(60, 40, 10, .12); background: var(--card); }
+.scv-frame canvas#cv { display: block; max-width: 100%; max-height: calc(100vh - 112px); width: auto; height: auto; }
+.scv-frame .scv-spot { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; transition: opacity .35s; }
+.scv-scope { position: absolute; right: 10px; top: 10px; width: 34%; aspect-ratio: 4 / 3; border-radius: 50%/42%; pointer-events: none;
+  box-shadow: 0 0 0 3px var(--ink), 0 0 0 7px var(--card), 0 8px 22px rgba(0, 0, 0, .25); background: var(--card); }
+.scv-error { position: absolute; inset: 0; margin: 0; padding: 18px; overflow: auto; background: rgba(250, 240, 236, .97); color: #8a1f11;
+  font: 13px/1.45 var(--mono); white-space: pre-wrap; line-height: 1.45; }
+.scv-badge { position: fixed; right: 14px; bottom: 14px; padding: 6px 10px; background: var(--ink); color: var(--card); font-size: 13px; opacity: 0; transition: opacity .2s; }
+.scv-badge.on { opacity: .92; }
+
+.scv-bar { width: 100%; max-width: 900px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.scv-bar button, .scv-bar select { font: inherit; color: var(--ink); background: var(--card); border: 1.5px solid var(--ink); border-radius: 6px;
+  padding: 4px 10px; min-height: 34px; cursor: pointer; }
+.scv-bar button:hover { background: #fffaf0; }
+.scv-bar button[aria-pressed="true"] { background: var(--ink); color: var(--card); }
+.scv-bar button:focus-visible, .scv-track:focus-visible, .scv-list li:focus-visible { outline: 2px solid var(--pink); outline-offset: 2px; }
+.scv-time { font-variant-numeric: tabular-nums; min-width: 92px; text-align: center; color: var(--ink-2); }
+.scv-track { position: relative; flex: 1 1 240px; height: 34px; cursor: pointer; touch-action: none; }
+.scv-track::before { content: ""; position: absolute; left: 0; right: 0; top: 15px; height: 4px; background: var(--rule); border-radius: 2px; }
+.scv-fill { position: absolute; left: 0; top: 15px; height: 4px; background: var(--pink); border-radius: 2px; }
+.scv-knob { position: absolute; top: 9px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: var(--card); border: 2px solid var(--pink); }
+.scv-tick { position: absolute; top: 12px; width: 1px; height: 10px; background: var(--ink-2); opacity: .45; }
+.scv-tick.ch { top: 6px; height: 22px; width: 2px; opacity: .9; background: var(--ink); }
+
+.scv-step { width: 100%; max-width: 900px; display: none; align-items: center; gap: 10px; padding: 10px 12px; background: var(--card);
+  border: 1.5px solid var(--ink); border-radius: 8px; }
+.scv-step.on { display: flex; }
+.scv-step .tag { font-family: var(--mono); color: var(--pink); white-space: nowrap; }
+.scv-step .note { flex: 1; font: 20px/1.35 var(--hand); }
+.scv-step button { font: inherit; background: var(--card); border: 1.5px solid var(--ink); border-radius: 6px; padding: 4px 12px; cursor: pointer; min-height: 34px; }
+
+.scv-list { max-height: calc(100vh - 28px); overflow: auto; position: sticky; top: 14px; padding: 4px 4px 24px; }
+.scv-list h1 { font: 26px/1.2 var(--hand); margin: 0 0 4px; }
+.scv-list .series { color: var(--ink-2); margin: 0 0 12px; }
+.scv-list h2 { font: 19px/1.3 var(--hand); margin: 16px 0 4px; }
+.scv-list h2 .num { color: var(--pink); margin-right: .4em; font-family: var(--mono); }
+.scv-list ol { list-style: none; margin: 0; padding: 0; }
+.scv-list li { display: grid; grid-template-columns: 44px 1fr auto; gap: 6px; padding: 5px 8px; border-radius: 6px; cursor: pointer; }
+.scv-list li:hover { background: rgba(255, 255, 255, .45); }
+.scv-list li.on { background: var(--card); box-shadow: inset 3px 0 0 var(--pink); }
+.scv-list li .tag { color: var(--pink); font-size: 13px; padding-top: 2px; }
+.scv-list li .t { color: var(--ink-2); font-size: 12px; padding-top: 2px; font-variant-numeric: tabular-nums; }
+.scv-list .keys { margin-top: 18px; color: var(--ink-2); font-size: 12px; }
+
+@media (max-width: 900px) {
+  .scv-shell { grid-template-columns: minmax(0, 1fr); }
+  .scv-stage, .scv-list { position: static; max-height: none; }
+  .scv-frame canvas#cv { max-height: 70vh; }
+}
+@media (prefers-reduced-motion: reduce) { .scv-frame .scv-spot { transition: none; } }

@@ -431,8 +431,18 @@ def test_cli():
 
 
 def test_examples_unchanged():
-    """films without the new fields: the checker's answers and the page's rule paths are what they always were"""
-    spec = json.loads((SKILL / 'examples/takeout/film.json').read_text())
+    """films without the new fields: the checker's answers and the page's rule paths are what they always were (the
+    examples now use rule.fix, rule.text and step fixes, so those are taken out first)"""
+    def plain(spec):
+        for ch in spec['chapters']:
+            if ch.get('rule'):
+                ch['rule'].pop('fix', None)
+                ch['rule'].pop('text', None)
+            for st in ch.get('steps', []):
+                if isinstance(st, dict):
+                    st.pop('fix', None)
+        return spec
+    spec = plain(json.loads((SKILL / 'examples/takeout/film.json').read_text()))
     res = mc.check_film(spec)
     assert res[3]['rule'] == {'holds': False, 'never': 'served', 'path': ['fresh', 'warm', 'cool', 'soggy', 'served'],
                               'edges': ['fresh>warm', 'warm>cool', 'cool>soggy', 'soggy>served'], 'steps': 4}
@@ -440,7 +450,7 @@ def test_examples_unchanged():
     page = mc.apply_found_paths(json.loads(json.dumps(spec)))
     assert page['chapters'][3]['rule'] == {'never': 'served', 'stamp': '规则被打破', 'path': ['fresh', 'warm', 'cool', 'soggy', 'served'], 'found': True}
     assert all('checked' not in ch for ch in page['chapters'])
-    msg = mc.check_film(json.loads((SKILL / 'examples/message/film.json').read_text()))
+    msg = mc.check_film(plain(json.loads((SKILL / 'examples/message/film.json').read_text())))
     assert msg[2]['rule']['path'] == ['out', 'wait', 'retry', 'twice']
 
 

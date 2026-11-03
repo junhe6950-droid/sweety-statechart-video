@@ -41,8 +41,10 @@
 | `voice` | `crayon-sister` | 旁白声音，见 voices.md；`"none"` 为无声 |
 | `speed` | 有旁白 2，无旁白 3 | 每步动画速度（参考页默认 3） |
 | `say` | 无 | 全片读法表 `{"写法": "读法"}`，例如 `{"42": "四十二"}`；字幕不变，只改读音 |
-| `music` | 无 | `"calm"` / `"warm"` / `"curious"` / `"focused"` / `"tense"`，或 `{"mood": …, "gain_db": -2}` |
-| `sfx` | `false` | `true`：卡片弹出时加一声轻“啵” |
+| `music` | 无 | `"calm"` / `"warm"` / `"curious"` / `"focused"` / `"tense"`，或 `{"mood": …, "gain_db": -2}`；加 `"sync": true` 让画面踩在音乐的拍子上，见下面“跟着音乐走” |
+| `sfx` | `false` | `true`：卡片第一次弹出时加一声轻“啵”（有自己 `sfx` 的卡片用自己的声音）。别的音效见下面“声音和语言” |
+| `language` | `zh` | 旁白和字幕的语言 |
+| `i18n` | 无 | 其他语言的译文，见下面“声音和语言” |
 | `watermark` | `制作：@leo_xiaolei/刘老板` | `null` 关掉 |
 | `player` | `{}` | 播放细节：`{"settle": false}` 让换章时完全照参考页滚动，不先停到新海报顶上 |
 
@@ -199,7 +201,80 @@
 
 ## 排版方向：`flow`
 
-`"flow": "down"`（默认）从上往下排。`"right"` 从左往右，适合横版。从 Mermaid 导入时，`direction LR` 会变成 `"right"`。
+`"flow": "down"` 从上往下排；`"right"` 从左往右。横版（宽大于高）且没有“同一时间”框的片子默认 `"right"`，海报和画面同形，链太长时海报自动加宽。有框的章仍从上往下排。竖版的图太长、放不下时，海报会自动加高，镜头在章内滚动（`check` 会提醒拆章）。从 Mermaid 导入时，`direction LR` 会变成 `"right"`。
+
+## 声音和语言
+
+```json
+"states": {"boil": {"label": "水开了", "sfx": "kettle", "ambience": "fire"}},
+"steps": [{"go": "cold>boil", "note": "咕嘟咕嘟，水开了", "tone": "惊讶", "speaker": "grandma", "sfx": "steam"}]
+```
+
+**状态**
+
+- **`sfx`**：这张卡片每次亮起时响一声，时间是圆点走到卡片的那一刻。可以写一个、一组（`["knock", "creak"]`），或者 `{"kind": "knock", "gain_db": -3}`。
+- **`ambience`**：这张卡片亮着的时候一直响的环境声，换到别的卡片就淡出。前后两张卡片是同一种环境声时连着不断。
+
+**步骤**
+
+- **`tone`**：这一句的语气，比如 `"惊讶"`、`"语速很慢"`、`"温柔舒缓"`。短短几个字，不要带括号。效果和限制见 voices.md 的“语气”。
+- **`speaker`**：这一句是谁在说（`cast` 里的名字）。画面上这个人的嘴跟着旁白动。
+- **`sfx`**：这一步额外的声音，写法和状态的一样。`{"kind": "paper", "at": 0.3}` 的 `at` 是步内时间，和 scenes.js 里的 `S.t` 同一把尺子；不写就是 0.85（圆点走到卡片）。
+
+规则章盖章时会自动“咚”一声，不用写。
+
+**跟着音乐走**
+
+`"music": {"mood": "curious", "sync": true}`：每一章在小节线上开始，盖章落在强拍上，音乐也跟着分段。做法借鉴了 Kevin Ngo 的 statechart-art（MIT）。
+
+- 无旁白：每一步都在拍子上开始，每一章在小节线上，盖章落在强拍。会比不对齐长一点（实测 54 秒的片子长了 9 秒）。
+- 有旁白：旁白的节奏不动。章节开头和盖章离下一个强拍不到 0.6 秒，就让画面多停一下；更远时让音乐等画面：前一小节的和弦多拖一会儿（延长记号），下一小节正好从这里开始。速度最多改 3%，用来少拖、少停。
+- 音乐分段跟着章节走：第一章稀疏，后面几章饱满一些；每章从主和弦重新开始。盖章那一拍加一声轻钹和一个更满的和弦。
+- `mix-report.json` 的 `music.sync` 列出每个对齐点离强拍差多少毫秒（`error_ms`），以及画面停了多久、音乐拖了多久。超过 60 毫秒会有 warning。
+
+**音效**（都是程序合成的，没有录音素材）：
+
+| 名字 | 声音 | 名字 | 声音 |
+|---|---|---|---|
+| `pop` | 卡片弹出的轻“啵” | `knock` | 敲门三下 |
+| `paper` | 翻纸 | `creak` | 门吱呀一声 |
+| `tick` | 钟表一声 | `bell` | 自行车铃两声 |
+| `chime` | 两声小铃 | `ding` | 手机“叮” |
+| `steam` | 水汽嘶嘶变响 | `typing` | 敲一串键盘 |
+| `kettle` | 水开：嘶声，再响起哨音 | `coins` | 几枚硬币落在台面上 |
+| `fire` | 划火柴、火苗噼啪 | `stamp` | 盖章“咚” |
+| `whoosh` | 呼的一下掠过 | | |
+
+**环境声**：`rain` 雨，`fire` 炉火，`street` 街上（远处车流），`room` 屋里的底噪。
+
+音效和环境声都放在旁白下面：有旁白时自动压低 6 dB，整片响度目标不变。`mix-report.json` 里有每一声的时间和电平，`voice_over_bed_db` 是每句旁白比音乐 + 环境声 + 音效高多少，低于 6 dB 判失败。
+
+**其他语言**
+
+`i18n` 放译文，一种语言一块：
+
+```json
+"i18n": {"en": {
+  "title": "A Message's Journey", "series": "Little Things in Your Phone",
+  "chapters": [{
+    "title": "Sending", "sub": "from typing to read",
+    "states": {"typing": {"label": "Typing"}},
+    "edges": {"typing>sending": {"label": "tap send"}, "sending>failed": {"label": "keeps spinning", "if": "no signal"}},
+    "exit": {"label": "who delivers it? ↓"},
+    "steps": [{"note": "You've typed a message. Still typing."}, {"note": "Tap send, and the little circle spins."}]
+  }]
+}}
+```
+
+- 章节和步骤按顺序对应；状态按 id，箭头按 `from>to`（同一对的第二条写 `a>b#2`，或者箭头自己的 `id`）。
+- 还可以译：`rule.stamp`、`exit.label`、`regions.title` 和 `regions.lanes[].title`，整片的 `voice`、`say` 等字段。
+- 中文的 `say` 读法不会带过去；英文里有数字时，在这一块里另写 `say`，比如 `{"3": "three"}`。
+- 没译到的字照旧显示中文，`scv.py check JOB --lang en` 会列出来。
+
+`scv.py all JOB --lang en` 在 `JOB/lang/en/` 生成英文版（译好的 film.json，加一份 scenes.js），然后照常跑一遍。每个命令都能加 `--lang`。
+
+- 插画里的字写在 scenes.js 里，不会自动翻译。要换语言就在 scenes.js 里判断：`const EN = FILM.language === 'en';`，再按 `EN` 选字。
+- 拉丁字母的字幕上限是 42 个字符（中文是 24 个字）。
 
 ## 自动排版
 
@@ -220,3 +295,63 @@
   - 支持约束输出的模型也能直接用。
 - 装了 `jsonschema` 包时，`check` 会顺带按它校验，问题列在 warning 里，前面带 `schema:`。没装就跳过。
 - 现成的状态机（XState、Mermaid、SCXML、PlantUML、/statechart 的输出）可以直接导入，见 [导入与导出](import-export.md)。
+
+## 交付：`deliver`
+
+`all` 渲染完会按 `"deliver"` 多出几样东西，也可以单独跑 `scv.py deliver JOB --what clips,gif`（不写 `--what` 就按 `deliver`，没有就全出）。都从同一次渲染来，要先跑过 `finalize`。
+
+```json
+{"deliver": ["clips", "longimage", "social", "gif", "html", "site"]}
+```
+
+| 名字 | 出什么 | 位置 |
+|---|---|---|
+| `clips` | 每章一条，按 `timing.json` 的章节边界切，带声音，头尾各 0.35 秒淡入淡出到纸色 | `outputs/clips/01-一份订单.mp4` |
+| `longimage` | 全部海报竖着拼成一张长图，宽 1080；超过 7200 像素高就在海报之间分成几张 | `outputs/longimage/long.jpg` |
+| `social` | 每张海报四种尺寸：1080 宽预览、x.com 用的 2048、小红书 1242×1660、Instagram 1080×1350。比例不合就用纸色补边，不拉伸 | `outputs/social/01-xhs.jpg` |
+| `gif` | 每章一张循环动图，540 宽、每秒 8 帧，每章单独调色板；超过 10 MB 就换成 480 宽、64 色（GitHub 贴图的上限） | `outputs/gif/01-一份订单.gif` |
+| `html` | 一个单文件网页：引擎、插画、数据、字体（只留用到的字）和声音都在里面，双击就能打开。能播放、拖动、调速、点步骤、逐步看 | `outputs/film.html` |
+| `site` | 一个画廊网站文件夹：每章一节，有海报、“显示排版”、检查结果、这一章的 film.json 和 Mermaid、图片说明、图的文字版，还有图标和分享卡 | `outputs/site/index.html` |
+
+`site` 的分享链接要写绝对地址时，渲染前设环境变量 `SCV_SITE_URL=https://…/`。
+
+## AI 生成标识：`aigc`
+
+按《人工智能生成合成内容标识办法》和 GB 45438-2025，成片、母版、每章切片、导出的音频、海报和交付的图片都在文件元数据里写一个 `AIGC` 字段（隐式标识）。位置按全国网安标委的实践指南：
+
+| 文件 | 写在哪 |
+|---|---|
+| MP4、M4A | `moov.udta.meta`：`keys` 里是 `AIGC`，`ilst` 里是下面的 JSON |
+| WAV | RIFF 里一个 ID 为 `AIGC` 的块 |
+| PNG | `iTXt` 里的 XMP（`TC260:AIGC`），外加一个关键字为 `AIGC` 的 `tEXt` |
+| JPEG、GIF | XMP（`TC260:AIGC`） |
+| 网页 | `<meta name="AIGC">` |
+
+```json
+{"Label": "1", "ContentProducer": "sweety-statechart-video", "ProduceID": "…", "ReservedCode1": "…", "ContentPropagator": "", "PropagateID": "", "ReservedCode2": ""}
+```
+
+- `Label` 总是 `"1"`（AI 生成）。
+- `ProduceID` 每部片不同：由 film.json、scenes.js 的内容哈希加渲染时间算出的 UUID。同一次渲染的所有文件用同一个。
+- `ReservedCode1` 是 `ContentProducer` 和 `ProduceID` 的短哈希，用来核对。
+- 要换成自己的：
+
+```json
+{"aigc": {"producer": "你的机构代码", "produce_id": "自己的编号", "propagator": "", "propagate_id": ""}}
+```
+
+只能用 ASCII 字符（标准附录 E 的要求），别的字符会被换成 `?`。查看：`python3 scripts/aigc.py read outputs/film.mp4`。原来的 `comment` 照旧保留。画面上的显式提示另见 `ai_label`。
+
+## 发布包
+
+`scv.py publish JOB`（`all` 最后也会跑）在 `outputs/publish/` 写：
+
+- `titles.txt`：三个标题备选（片名加系列和集数、章节串起来的一句、一个问题）；
+- `description.txt`：简介，有章节列表；`next` 写了就加“下一集”；
+- `tags.txt`：话题，一行带 `#`，一行不带；
+- `chapters.txt`：章节时间，B 站和 YouTube 的格式，从 `00:00` 开始；
+- `cover.txt`：封面大字和小字；
+- `alt.txt`：每张海报的长图片说明，给读屏软件和图文平台；
+- `publish.md`：以上全部，加各平台的画幅、时长建议、标题字数上限，和图的文字版；`publish.json` 是同样的内容。
+
+全部从 film.json 和 `timing.json` 生成，不联网，不调用模型。系列片写 `"episode": 3` 和 `"next": "下一集讲什么"`。

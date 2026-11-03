@@ -19,12 +19,17 @@ usage: scv.py <command> JOB [options]
   stills    JOB [--at t,..]   frames to work/stills/ + contact sheet (default: late in every step)
   render    JOB [--workers N] [--start S --end E]   frames -> work/render/video.mp4
   posters   JOB               finished posters -> outputs/posters/, outputs/cover.png
-  finalize  JOB               cover intro + sound -> outputs/film.mp4, shifted captions.srt, script.txt
-  all       JOB               check, lines, voice, plan, render, posters, finalize
+  finalize  JOB               cover intro + sound (voice / music / sfx) + mux -> outputs/film.mp4, film-master.mp4, shifted captions.srt, script.txt
+  all       JOB               check, lines, voice, plan, render, posters, finalize (+ deliver, publish)
+  deliver   JOB [--what clips,longimage,html,gif,site,social]   more outputs from the same render (scripts/deliver.py)
+  publish   JOB               outputs/publish/: titles, description, tags, chapter times, platform notes (publish.py)
+  preview   JOB [--port N] [--open]   the film in a player on 127.0.0.1, with sound; reloads on edits (preview.py)
+  golden    [--update]        the three examples at fixed times against tests/golden/ (scripts/golden.py)
   batch     JOB [JOB...]      `all` for each job, then a summary
   voices                      list the voices
   add-voice ID --audio F --text T --consent self|authorized [--start S --end E] [--preview]
                               add your own voice (scripts/add_voice.py)
+  any JOB command takes --lang CODE: the translated version (film.json "i18n") in JOB/lang/CODE/ (scripts/i18n.py)
 """
 import argparse
 import base64
@@ -39,6 +44,8 @@ import time
 from pathlib import Path
 
 import modelcheck
+import i18n
+import audio_plan
 
 SKILL = Path(__file__).resolve().parent.parent
 ENGINE = SKILL / 'engine'
@@ -222,8 +229,9 @@ def check(job, spec, quiet=False):
                     errors.append(f'{where} step {si + 1}: go {r!r} matches no arrow (arrows: {", ".join(ids)})')
                 used.add(r)
             note = st.get('note') or ''
-            if len(note) > CAPTION_MAX:
-                warnings.append(f'{where} step {si + 1}: caption has {len(note)} characters (keep to {CAPTION_MAX}): {note}')
+            cap = i18n.caption_max(spec.get('language'), note)       # D: 24 for Chinese, 42 for Latin scripts
+            if len(note) > cap:
+                warnings.append(f'{where} step {si + 1}: caption has {len(note)} characters (keep to {cap}): {note}')
             if st.get('voice'):
                 try:
                     sys.path.insert(0, str(SCRIPTS))
@@ -314,6 +322,7 @@ def check(job, spec, quiet=False):
                 warnings.append(f"{where}: stuck combinations (no way out): {multi[:3]}")
     if not (job / 'scenes.js').exists():
         warnings.append('no scenes.js: the posters will have no pictures (see references/scenes.md)')
+    warnings += audio_plan.lint(spec)                                # D: sfx / ambience / tone / speaker fields
     if chapters and not errors:
         est, (lo, hi) = estimate_seconds(spec), target_duration(spec)
         nsteps = max(1, len(steps_of(spec)))
@@ -394,6 +403,7 @@ def write_page(job, spec, mode='play', timing=None, opts=None):
 {tags}
 {f'<script src="{scenes}"></script>' if scenes else ''}
 <script src="{(CRAYON / 'main.js').as_uri()}"></script>
+<script src="{(CRAYON / 'record.js').as_uri()}"></script>
 </body></html>"""
     page = work / f'page-{mode}.html'
     page.write_text(html)
@@ -489,6 +499,8 @@ def write_lines(job, spec):
             item['say'] = st['say']
         if st.get('voice'):
             item['voice'] = st['voice']
+        if st.get('tone'):
+            item['tone'] = st['tone']                    # VoxCPM2 control text, see references/voices.md
         lines.append(item)
     out = {'language': spec.get('language', 'zh'), 'voice': v, 'say': spec.get('say') or {}, 'lines': lines}
     if spec.get('voxcpm'):
@@ -537,7 +549,7 @@ def plan(job, spec):
         if n + 1 == len(allsteps):
             d += 2.5 / sp + .8
         steps.append({'id': lid, 'ci': ci, 'si': si, 't0': round(t, 3), 'dur': round(d, 3), 't1': round(t + d, 3),
-                      'note': st.get('note') or '', 'tag': f"{ROMAN[ci]}.{si + 1}"})
+                      'note': st.get('note') or '', 'tag': f"{ROMAN[ci]}.{si + 1}", 'speaker': st.get('speaker')})
         t += d
     total = round(t + .4, 3)
     lo, hi = target_duration(spec)
@@ -554,20 +566,32 @@ def plan(job, spec):
             k = next(i for i, s_ in enumerate(steps) if s_['id'] == line['id'])
             line['at'] = round(steps[k]['t0'] + VOICE_AT, 3)
         total = round(total + shift, 3)
+    total, sync = audio_plan.music_sync(spec, steps, lines, sp, total, VOICE_AT)   # D: music "sync": onto the beat grid
     W, H = frame_size(spec)
     timing = {'W': W, 'H': H, 'fps': int(spec.get('fps', FPS)), 'speed': sp, 'lead': LEAD, 'duration': total, 'total': total, 'voice': v, 'target': [lo, hi], 'steps': steps}
+    # D: karaoke characters and the talk envelope (film seconds), sfx and ambience events (scripts/audio_plan.py)
+    entries = rep['lines'] if v else {}
+    at_of = {line['id']: line['at'] for line in lines}
+    for s_ in steps:
+        s_['chars'] = audio_plan.step_chars(entries.get(s_['id']), s_['note'], at_of[s_['id']]) if s_['id'] in at_of else None
+    timing['talk'] = audio_plan.talk_envelope([(line['at'], entries[line['id']]) for line in lines], total, timing['fps']) if lines else None
+    sfx, ambience = audio_plan.sound_events(spec, steps, sp)
     (job / 'work').mkdir(exist_ok=True)
-    sfx = [{'kind': 'pop', 'at': round(s['t0'] + .9 / sp, 3), 'gain_db': -6} for s in steps] if spec.get('sfx') else []
     music = spec.get('music') or None
     if isinstance(music, str):
         music = {'mood': music}
-    timeline = {'duration': total, 'lines': lines, 'music': music, 'sfx': sfx}
-    timing, timeline = stage(spec, timing, timeline)
+    if sync:
+        music = {**music, 'sync': sync}
+    timeline = {'duration': total, 'lines': lines, 'music': music, 'sfx': sfx, 'ambience': ambience}
+    timing, timeline = stage(spec, timing, timeline, sync)          # the hook and the overview (shifts everything after the hook)
     total = timing['total']
     (job / 'work/timing.json').write_text(json.dumps(timing, ensure_ascii=False, indent=1))
     (job / 'work/timeline.json').write_text(json.dumps(timeline, ensure_ascii=False, indent=1))
     print(f'plan: {len(steps)} steps, {total:.1f} s at speed {sp:g}' + (f', {len(lines)} narrated lines' if lines else ', silent')
-          + (f', +{stretch:.2f} s hold per step toward the target' if stretch else ''))
+          + (f', +{stretch:.2f} s hold per step toward the target' if stretch else '')
+          + (f', {len(sfx)} sfx' if sfx else '') + (f", ambience {', '.join(a['kind'] for a in ambience)}" if ambience else '')
+          + (f", music on the beat ({sync['bpm']:g} bpm, +{sync['holds_s']:.2f} s, worst "
+             f"{max(abs(x['planned_error_ms']) for x in sync['targets']):.0f} ms)" if sync else ''))
     if total < lo - 1 or total > hi + 1:
         print(f'note: {total:.0f} s is outside the target {lo:.0f}-{hi:.0f} s ("duration" in film.json); '
               + ('add steps or a chapter' if total < lo else 'cut steps') + ' to land inside it')
@@ -594,13 +618,17 @@ def page_timing(timing):
 HOOK_SECONDS, OUTRO_SECONDS = 3.4, 5.5
 
 
-def stage(spec, timing, timeline):
+def stage(spec, timing, timeline, sync=None):
     """the opening hook (the finished first poster and a question) and the closing overview: shift everything after
-    the hook, add the outro at the end. Applied by plan() just before it writes timing.json and timeline.json."""
+    the hook, add the outro at the end. Applied by plan() just before it writes timing.json and timeline.json. With
+    music sync the hook lasts whole bars, so everything after it stays on the beat grid."""
     hook = spec.get('hook')
     outro = spec.get('outro', 'overview' if len(spec.get('chapters') or []) >= 2 else False)
     if hook:
         d = HOOK_SECONDS
+        if sync and sync.get('bpm'):
+            bar = 4 * 60. / float(sync['bpm'])
+            d = round(max(1, math.ceil(HOOK_SECONDS / bar - .25)) * bar, 3)
         timing['hook'] = {'dur': d, 'text': hook if isinstance(hook, str) else (spec.get('title') or '')}
         for s in timing['steps']:
             s['t0'] = round(s['t0'] + d, 3)
@@ -677,28 +705,36 @@ def posters(job, spec):
 
 
 # ------------------------------------------------------------------ render
-def render_chunk(job, spec, f0, f1, dest):
-    """one browser renders frames [f0, f1) into one H.264 file; any failure exits non-zero (the parent retries)"""
+def render_chunk(job, spec, f0, f1, dest, encoder='legacy'):
+    """one browser renders frames [f0, f1) into one H.264 file (x264 also writes the master's chunk, see frames.py);
+    any failure exits non-zero (the parent retries)"""
     from playwright.sync_api import sync_playwright
+    import frames
     timing = json.loads((job / 'work/timing.json').read_text())
     W, H, fps = timing['W'], timing['H'], timing['fps']
-    cmd = ['ffmpeg', '-v', 'error', '-y', '-f', 'image2pipe', '-framerate', str(fps), '-c:v', 'mjpeg', '-i', '-',
-           '-c:v', 'libx264', '-preset', 'slow', '-crf', '26', '-pix_fmt', 'yuv420p', '-g', str(fps * 2), str(dest)]
-    ff = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+    if encoder == 'legacy':
+        cmd = ['ffmpeg', '-v', 'error', '-y', '-f', 'image2pipe', '-framerate', str(fps), '-c:v', 'mjpeg', '-i', '-',
+               '-c:v', 'libx264', '-preset', 'slow', '-crf', '26', '-pix_fmt', 'yuv420p', '-g', str(fps * 2), str(dest)]
+        ff = subprocess.Popen(cmd, stdin=subprocess.PIPE)
     beat = Path(str(dest) + '.beat')
     beat.write_text('launch')
     with sync_playwright() as p:
         b, pg, errors = open_page(p, job / 'work/page-play.html', W, H)
         beat.write_text(f'ready {f0}')
         pg.set_default_timeout(30000)
-        for f in range(f0, f1):
-            ff.stdin.write(b64(pg.evaluate(f'frameJPEG({f / fps:.6f}, .94)')))
-            if f % 15 == 0:
-                beat.write_text(f'frame {f}')
+        if encoder == 'legacy':
+            for f in range(f0, f1):
+                ff.stdin.write(b64(pg.evaluate(f'frameJPEG({f / fps:.6f}, .94)')))
+                if f % 15 == 0:
+                    beat.write_text(f'frame {f}')
+            ff.stdin.close()
+            rc = ff.wait()
+        elif encoder == 'webcodecs':
+            rc = frames.record_webcodecs(pg, W, H, fps, f0, f1, dest, beat)
+        else:
+            rc = frames.record_x264(pg, W, H, fps, f0, f1, dest, beat)
         if errors:
             print('page errors:', *errors[:3], sep='\n  ', file=sys.stderr)
-        ff.stdin.close()
-        rc = ff.wait()
         beat.write_text('done' if rc == 0 else 'ffmpeg-failed')
         import threading  # closing Chrome can hang: try politely, never wait long
         th = threading.Thread(target=lambda: b.close(), daemon=True)
@@ -709,12 +745,23 @@ def render_chunk(job, spec, f0, f1, dest):
         os._exit(0 if rc == 0 else 3)
 
 
-def render(job, spec, workers=6, start=0.0, end=None, chunk_seconds=8.0):
+def render(job, spec, workers=6, start=0.0, end=None, chunk_seconds=8.0, encoder=None):
     """short chunks, each in its own process group with a heartbeat; a stuck or crashed browser is killed and its
-    chunk rendered again"""
+    chunk rendered again. encoder: x264 (default: film + master), webcodecs, legacy (see frames.py)"""
     import signal
+    import frames
+    encoder = frames.encoder_of(spec, encoder)
     timing = json.loads((job / 'work/timing.json').read_text())
     write_page(job, spec, 'play', page_timing(timing))
+    if encoder == 'webcodecs':
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            b, pg, _ = open_page(p, job / 'work/page-play.html', timing['W'], timing['H'])
+            ok = frames.probe_webcodecs(pg)
+            b.close()
+        if not ok.get('supported'):
+            print(f'webcodecs: this Chrome has no {frames.WEBCODECS["codec"]} encoder; using x264', flush=True)
+            encoder = 'x264'
     fps = timing['fps']
     dur = end or timing['duration']
     F0, F1 = round(start * fps), round(dur * fps)
@@ -730,7 +777,7 @@ def render(job, spec, workers=6, start=0.0, end=None, chunk_seconds=8.0):
         while todo and len(running) < workers:
             i, a, b, dest, tries = todo.pop(0)
             log = open(seg / f'chunk{i:04d}.log', 'w')
-            pr = subprocess.Popen([sys.executable, __file__, '_chunk', str(job), str(a), str(b), str(dest)], stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+            pr = subprocess.Popen([sys.executable, __file__, '_chunk', str(job), str(a), str(b), str(dest), encoder], stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
             running.append([pr, (i, a, b, dest, tries), time.time() + 120 + (b - a) * 1.2, log, time.time(), -1])
         time.sleep(0.5)
         for item in running[:]:
@@ -765,11 +812,19 @@ def render(job, spec, workers=6, start=0.0, end=None, chunk_seconds=8.0):
                 failed.append(i)
     if failed:
         raise SystemExit(f'render failed: chunks {failed} (see work/render/seg/*.log)')
-    lst = seg / 'list.txt'
-    lst.write_text(''.join(f"file '{c}'\n" for c in chunks))
-    dest = job / 'work/render/video.mp4'
-    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', str(lst), '-c', 'copy', str(dest)], check=True)
-    print(f'wrote {dest} ({F1 - F0} frames in {time.time() - t0:.0f} s)')
+    dest, master = job / 'work/render/video.mp4', job / 'work/render/master.mp4'
+    masters = [frames.master_path(c) for c in chunks] if encoder == 'x264' else []
+    masters = masters if masters and all(m.exists() for m in masters) else []
+    for parts, out in [(chunks, dest)] + ([(masters, master)] if masters else []):
+        lst = seg / f'list-{out.stem}.txt'
+        lst.write_text(''.join(f"file '{c}'\n" for c in parts))
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', str(lst), '-c', 'copy', str(out)], check=True)
+    if not masters and master.exists():
+        master.unlink()                              # a master from an older render would not match this video
+    secs = time.time() - t0
+    (job / 'work/render/info.json').write_text(json.dumps({'encoder': encoder, 'frames': F1 - F0, 'seconds': round(secs, 1),
+                                                           'rendered_at': time.strftime('%Y-%m-%dT%H:%M:%S%z')}))
+    print(f'wrote {dest}' + (' and master.mp4' if masters else '') + f' ({F1 - F0} frames in {secs:.0f} s, {encoder})')
     return dest
 
 
@@ -785,7 +840,7 @@ def run_py(script, *args, python=None):
 def sound(job, spec):
     """voice and/or music and/or sfx through mix.py; nothing for a silent film"""
     tl = json.loads((job / 'work/timeline.json').read_text())
-    if not (tl['lines'] or tl.get('music') or tl.get('sfx')):
+    if not (tl['lines'] or tl.get('music') or tl.get('sfx') or tl.get('ambience')):
         return None
     py = RENDER_PY if Path(RENDER_PY).exists() else None
     a = job / 'work/audio'
@@ -819,31 +874,55 @@ def finalize(job, spec):
     else:  # a silent track, so every platform accepts the file
         audio = ['-f', 'lavfi', '-t', str(timing['duration']), '-i', 'anullsrc=r=48000:cl=stereo']
     comment = 'comment=AI-generated narration (VoxCPM2 designed voice)' if voice_of(spec) else 'comment=sweety-statechart-video'
+    import aigc                                      # GB 45438 implicit label: AIGC in moov.udta.meta (see aigc.py)
+    import frames as frames_mod
+    label = aigc.identity(job, spec)
+    aigc.save(job, label)
+    meta = ['-metadata', comment, *aigc.ffmpeg_args(label), '-movflags', '+faststart+use_metadata_tags']
     duration = round(timing['duration'] + intro_seconds, 3)
-    inputs = ['-i', str(video), *audio]
-    encoding = ['-map', '0:v', '-map', '1:a', '-c:v', 'copy']
-    if intro_seconds:
-        width, height, fps = timing['W'], timing['H'], timing['fps']
-        inputs += ['-loop', '1', '-framerate', str(fps), '-i', str(cover)]
-        filters = (
-            f'[2:v]scale={width}:{height}:force_original_aspect_ratio=decrease,'
-            f'pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps={fps},'
-            f'trim=duration={intro_seconds},setpts=PTS-STARTPTS,format=yuv420p,'
-            f'fade=t=out:st={COVER_HOLD_SECONDS}:d={COVER_FADE_SECONDS}[cover];'
-            f'[0:v]setpts=PTS-STARTPTS,setsar=1,fps={fps},format=yuv420p[body];'
-            '[cover][body]concat=n=2:v=1:a=0[video];'
-            f'[1:a]asetpts=PTS-STARTPTS,adelay={round(intro_seconds * 1000)}:all=1,'
-            f'apad,atrim=duration={duration}[audio]'
-        )
-        encoding = ['-filter_complex', filters, '-map', '[video]', '-map', '[audio]',
-                    '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-pix_fmt', 'yuv420p', '-r', str(fps)]
-    # Always build from the unprefixed render; repeated finalize calls must not stack intros or subtitle offsets.
-    pending = outd / '.film-finalizing.mp4'
-    subprocess.run(['ffmpeg', '-v', 'error', '-y', *inputs, *encoding, '-c:a', 'aac', '-b:a', '192k',
-                    '-t', str(duration), '-shortest', '-movflags', '+faststart', '-metadata', comment, str(pending)], check=True)
-    pending.replace(dest)
+    master, master_out = work / 'render/master.mp4', outd / 'film-master.mp4'
+
+    def encode(src, out, abr, vargs):
+        """the platform file or the upload master: the cover intro (when on) re-encodes with that file's own x264
+        settings; without it the render's video is copied. Always built from the unprefixed render, so repeated
+        finalize calls never stack intros or subtitle offsets."""
+        inputs = ['-i', str(src), *audio]
+        encoding = ['-map', '0:v', '-map', '1:a', '-c:v', 'copy']
+        if intro_seconds:
+            width, height, fps = timing['W'], timing['H'], timing['fps']
+            inputs += ['-loop', '1', '-framerate', str(fps), '-i', str(cover)]
+            filters = (
+                f'[2:v]scale={width}:{height}:force_original_aspect_ratio=decrease,'
+                f'pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps={fps},'
+                f'trim=duration={intro_seconds},setpts=PTS-STARTPTS,format=yuv420p,'
+                f'fade=t=out:st={COVER_HOLD_SECONDS}:d={COVER_FADE_SECONDS}[cover];'
+                f'[0:v]setpts=PTS-STARTPTS,setsar=1,fps={fps},format=yuv420p[body];'
+                '[cover][body]concat=n=2:v=1:a=0[video];'
+                f'[1:a]asetpts=PTS-STARTPTS,adelay={round(intro_seconds * 1000)}:all=1,'
+                f'apad,atrim=duration={duration}[audio]'
+            )
+            encoding = ['-filter_complex', filters, '-map', '[video]', '-map', '[audio]', *vargs, '-r', str(fps)]
+        pending = out.with_name('.' + out.stem + '-finalizing.mp4')
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', *inputs, *encoding, '-c:a', 'aac', '-b:a', abr,
+                        '-t', str(duration), '-shortest', *meta, str(pending)], check=True)
+        pending.replace(out)
+
+    encode(video, dest, '192k', frames_mod.FILM)
+    if master.exists():
+        encode(master, master_out, '320k', frames_mod.MASTER)
+    elif master_out.exists():
+        master_out.unlink()                          # from an older render
     (outd / 'editing').mkdir(exist_ok=True)
+    if mix and mix.exists():                         # the narration-bearing mix, for editors, labelled too
+        shutil.copy(mix, outd / 'editing/audio.wav')
+        aigc.tag_wav(outd / 'editing/audio.wav', label)
+    for f in sorted((outd / 'posters').glob('*.png')) + [outd / 'cover.png']:
+        if f.exists():
+            aigc.tag_png(f, label)
     delivery_steps = [{**s, 't0': round(s['t0'] + intro_seconds, 3), 't1': round(s['t1'] + intro_seconds, 3)} for s in timing['steps']]
+    for step in delivery_steps:
+        if step.get('chars'):
+            step['chars'] = [[c, round(a + intro_seconds, 3), round(b + intro_seconds, 3)] for c, a, b in step['chars']]
     rows = [f"{i + 1}\n{srt_time(s['t0'])} --> {srt_time(s['t1'])}\n{s['note']}\n" for i, s in enumerate(delivery_steps) if s['note']]
     (outd / 'editing/captions.srt').write_text('\n'.join(rows))
     (outd / 'editing/delivery-timing.json').write_text(json.dumps({
@@ -854,6 +933,9 @@ def finalize(job, spec):
     (outd / 'script.txt').write_text('\n'.join(f"{s['tag']}  {s['note']}" for s in timing['steps']))
     probe = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration,size', '-of', 'json', str(dest)], capture_output=True, text=True)
     print('delivered', dest, json.dumps(json.loads(probe.stdout or '{}').get('format', {})))
+    if master_out.exists():
+        print('upload master', master_out, f'{master_out.stat().st_size / 1e6:.1f} MB')
+    print('AIGC', aigc.value(aigc.read(dest) or {}))
     return dest
 
 
@@ -867,7 +949,12 @@ def all_steps(job, spec, workers=6):
     plan(job, spec)
     render(job, spec, workers=workers)
     posters(job, spec)
-    return finalize(job, spec)
+    dest = finalize(job, spec)
+    import deliver, publish                                    # extra outputs: film.json "deliver"; the publish pack
+    if spec.get('deliver'):
+        deliver.deliver(job, spec, spec['deliver'])
+    publish.publish(job, spec)
+    return dest
 
 
 # ------------------------------------------------------------------ new job
@@ -937,23 +1024,34 @@ def main():
     ap.add_argument('--end', type=float)
     ap.add_argument('--title')
     ap.add_argument('--redo')
+    ap.add_argument('--lang', help='work on the translated version from film.json i18n (JOB/lang/<code>/)')
+    ap.add_argument('--encoder', help='render: x264 (default), webcodecs or legacy')
+    ap.add_argument('--what', help='deliver: clips,longimage,html,gif,site,social (default: film.json "deliver", else all)')
+    ap.add_argument('--port', type=int, default=8765, help='preview: port on 127.0.0.1')
+    ap.add_argument('--open', action='store_true', help='preview: open it in the default browser')
+    ap.add_argument('--update', action='store_true', help='golden: store the current frames as the new baseline')
     a = ap.parse_args()
     if a.cmd == 'voices':
         return list_voices()
     if a.cmd == 'new':
         return new_job(a.jobs[0], a.title)
-    browser = ('layout', 'stills', 'render', 'posters', 'all', 'batch', '_chunk', 'lint')
+    browser = ('layout', 'stills', 'render', 'posters', 'all', 'batch', '_chunk', 'lint', 'deliver', 'golden')
     if a.cmd in browser and need_render_python() and Path(RENDER_PY).exists() and sys.executable != RENDER_PY:
         os.execv(RENDER_PY, [RENDER_PY, __file__, *sys.argv[1:]])
     if a.cmd == '_chunk':
         job, spec = load(a.jobs[0])
-        return render_chunk(job, spec, int(a.jobs[1]), int(a.jobs[2]), Path(a.jobs[3]))
+        return render_chunk(job, spec, int(a.jobs[1]), int(a.jobs[2]), Path(a.jobs[3]), *a.jobs[4:5])
+    if a.cmd == 'golden':                                      # the three examples; no JOB
+        import golden
+        sys.exit(golden.run(update=a.update, examples=a.jobs or None))
     if a.cmd == 'batch':
         summary = []
         for j in a.jobs:
             t0 = time.time()
             try:
                 job, spec = load(j)
+                if a.lang:
+                    job, spec = load(i18n.sibling(job, spec, a.lang)[0])
                 dest = all_steps(job, spec, workers=a.workers)
                 summary.append({'job': str(job), 'ok': True, 'film': str(dest), 'seconds': round(time.time() - t0)})
             except SystemExit as e:
@@ -961,6 +1059,8 @@ def main():
         print(json.dumps(summary, ensure_ascii=False, indent=1))
         return
     job, spec = load(a.jobs[0])
+    if a.lang:                                                     # the translated sibling job, then the same pipeline
+        job, spec = load(i18n.sibling(job, spec, a.lang)[0])
     if a.cmd == 'check':
         sys.exit(1 if check(job, spec)['errors'] else 0)
     elif a.cmd == 'layout':
@@ -977,11 +1077,20 @@ def main():
     elif a.cmd == 'stills':
         stills(job, spec, times=[float(x) for x in a.at.split(',')] if a.at else None, tw=a.width)
     elif a.cmd == 'render':
-        render(job, spec, workers=a.workers, start=a.start, end=a.end)
+        render(job, spec, workers=a.workers, start=a.start, end=a.end, encoder=a.encoder)
     elif a.cmd == 'posters':
         posters(job, spec)
     elif a.cmd == 'finalize':
         finalize(job, spec)
+    elif a.cmd == 'deliver':
+        import deliver
+        deliver.deliver(job, spec, a.what)
+    elif a.cmd == 'publish':
+        import publish
+        publish.publish(job, spec)
+    elif a.cmd == 'preview':
+        import preview
+        preview.serve(job, a.port, a.open)
     elif a.cmd == 'all':
         all_steps(job, spec, workers=a.workers)
     else:
