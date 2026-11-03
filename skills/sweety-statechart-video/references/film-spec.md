@@ -295,3 +295,63 @@
   - 支持约束输出的模型也能直接用。
 - 装了 `jsonschema` 包时，`check` 会顺带按它校验，问题列在 warning 里，前面带 `schema:`。没装就跳过。
 - 现成的状态机（XState、Mermaid、SCXML、PlantUML、/statechart 的输出）可以直接导入，见 [导入与导出](import-export.md)。
+
+## 交付：`deliver`
+
+`all` 渲染完会按 `"deliver"` 多出几样东西，也可以单独跑 `scv.py deliver JOB --what clips,gif`（不写 `--what` 就按 `deliver`，没有就全出）。都从同一次渲染来，要先跑过 `finalize`。
+
+```json
+{"deliver": ["clips", "longimage", "social", "gif", "html", "site"]}
+```
+
+| 名字 | 出什么 | 位置 |
+|---|---|---|
+| `clips` | 每章一条，按 `timing.json` 的章节边界切，带声音，头尾各 0.35 秒淡入淡出到纸色 | `outputs/clips/01-一份订单.mp4` |
+| `longimage` | 全部海报竖着拼成一张长图，宽 1080；超过 7200 像素高就在海报之间分成几张 | `outputs/longimage/long.jpg` |
+| `social` | 每张海报四种尺寸：1080 宽预览、x.com 用的 2048、小红书 1242×1660、Instagram 1080×1350。比例不合就用纸色补边，不拉伸 | `outputs/social/01-xhs.jpg` |
+| `gif` | 每章一张循环动图，540 宽、每秒 8 帧，每章单独调色板；超过 10 MB 就换成 480 宽、64 色（GitHub 贴图的上限） | `outputs/gif/01-一份订单.gif` |
+| `html` | 一个单文件网页：引擎、插画、数据、字体（只留用到的字）和声音都在里面，双击就能打开。能播放、拖动、调速、点步骤、逐步看 | `outputs/film.html` |
+| `site` | 一个画廊网站文件夹：每章一节，有海报、“显示排版”、检查结果、这一章的 film.json 和 Mermaid、图片说明、图的文字版，还有图标和分享卡 | `outputs/site/index.html` |
+
+`site` 的分享链接要写绝对地址时，渲染前设环境变量 `SCV_SITE_URL=https://…/`。
+
+## AI 生成标识：`aigc`
+
+按《人工智能生成合成内容标识办法》和 GB 45438-2025，成片、母版、每章切片、导出的音频、海报和交付的图片都在文件元数据里写一个 `AIGC` 字段（隐式标识）。位置按全国网安标委的实践指南：
+
+| 文件 | 写在哪 |
+|---|---|
+| MP4、M4A | `moov.udta.meta`：`keys` 里是 `AIGC`，`ilst` 里是下面的 JSON |
+| WAV | RIFF 里一个 ID 为 `AIGC` 的块 |
+| PNG | `iTXt` 里的 XMP（`TC260:AIGC`），外加一个关键字为 `AIGC` 的 `tEXt` |
+| JPEG、GIF | XMP（`TC260:AIGC`） |
+| 网页 | `<meta name="AIGC">` |
+
+```json
+{"Label": "1", "ContentProducer": "sweety-statechart-video", "ProduceID": "…", "ReservedCode1": "…", "ContentPropagator": "", "PropagateID": "", "ReservedCode2": ""}
+```
+
+- `Label` 总是 `"1"`（AI 生成）。
+- `ProduceID` 每部片不同：由 film.json、scenes.js 的内容哈希加渲染时间算出的 UUID。同一次渲染的所有文件用同一个。
+- `ReservedCode1` 是 `ContentProducer` 和 `ProduceID` 的短哈希，用来核对。
+- 要换成自己的：
+
+```json
+{"aigc": {"producer": "你的机构代码", "produce_id": "自己的编号", "propagator": "", "propagate_id": ""}}
+```
+
+只能用 ASCII 字符（标准附录 E 的要求），别的字符会被换成 `?`。查看：`python3 scripts/aigc.py read outputs/film.mp4`。原来的 `comment` 照旧保留。画面上的显式提示另见 `ai_label`。
+
+## 发布包
+
+`scv.py publish JOB`（`all` 最后也会跑）在 `outputs/publish/` 写：
+
+- `titles.txt`：三个标题备选（片名加系列和集数、章节串起来的一句、一个问题）；
+- `description.txt`：简介，有章节列表；`next` 写了就加“下一集”；
+- `tags.txt`：话题，一行带 `#`，一行不带；
+- `chapters.txt`：章节时间，B 站和 YouTube 的格式，从 `00:00` 开始；
+- `cover.txt`：封面大字和小字；
+- `alt.txt`：每张海报的长图片说明，给读屏软件和图文平台；
+- `publish.md`：以上全部，加各平台的画幅、时长建议、标题字数上限，和图的文字版；`publish.json` 是同样的内容。
+
+全部从 film.json 和 `timing.json` 生成，不联网，不调用模型。系列片写 `"episode": 3` 和 `"next": "下一集讲什么"`。
