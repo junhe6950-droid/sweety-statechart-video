@@ -7,6 +7,8 @@ usage: scv.py <command> JOB [options]
   new       JOB [--title T]   a job folder with a film.json and scenes.js to fill in
   check     JOB               structure, step references, captions, the rule checker (it finds the red path)
   layout    JOB               every chapter's finished poster with a grid + free areas (work/layout/), for scenes.js
+  draft     JOB [--write]     scenes.draft.js from the layout: a set piece and props in the free areas (scene_draft.py)
+  gallery   [--out DIR]       contact sheets of every prop, person and set piece (scripts/gallery.py)
   lines     JOB               work/lines.json: one narration line per captioned step
   voice     JOB [--redo ID]   synthesize, gate and ASR-check the lines (scripts/voice.py, MLX Python)
   plan      JOB               step times (from the voice, or the reference pace), work/timing.json + timeline.json
@@ -768,6 +770,9 @@ def list_voices():
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] in ('gallery', 'draft'):    # own options: scripts/gallery.py, scripts/scene_draft.py
+        sys.path.insert(0, str(SCRIPTS))
+        sys.exit(__import__('gallery' if sys.argv[1] == 'gallery' else 'scene_draft').main(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == 'add-voice':         # its own options; handled by add_voice.py
         run_py('add_voice.py', *sys.argv[2:], python=MLX_PY if Path(MLX_PY).exists() else None)
         return
