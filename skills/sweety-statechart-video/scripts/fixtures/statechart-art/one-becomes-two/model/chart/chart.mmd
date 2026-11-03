@@ -1,0 +1,85 @@
+---
+title: "One becomes two"
+---
+stateDiagram-v2
+  state "Legend" as legend {
+    lg0: Breaks DaughtersCarryNoMutation or EachDaughterGetsOneOfEach or NeverCopiesDamagedDNA or SeparatesOnlyWhenAllCaught
+    lg1: Path to the DaughtersCarryNoMutation or EachDaughterGetsOneOfEach or NeverCopiesDamagedDNA or SeparatesOnlyWhenAllCaught bug
+  }
+  class lg0 breaks
+  class lg1 bugPath
+  state "Getting ready (interphase)" as s0 {
+    s1: Growing (G1)
+    s2: Damaged, and p53 is broken
+    s3: Resting (G0)
+    s4: Copying its DNA (S)
+    s5: Damaged, held by p53
+    s6: Copying damaged DNA
+    s7: Checking the copy (G2)
+    s8: Damaged, held at the second check
+  }
+  s9: Dies on purpose (apoptosis)
+  state "Dividing (mitosis)" as s10 {
+    s11: Coiling up (prophase)
+    s12: The spindle reaches in (prometaphase)
+    s13: Some caught, the check waits
+    s14: Some caught, the check is broken
+    s15: Lined up in the middle (metaphase)
+    s16: Pulled apart too soon
+    s17: Sisters pulled apart (anaphase)
+    s18: Two nuclei form (telophase)
+    s19: Pinching in two (cytokinesis)
+  }
+  s20: Two cells with the wrong chromosomes
+  s21: Two healthy cells
+  s22: Two cells carrying a mutation
+  [*] --> s1
+  s1 --> s2: the DNA is damaged [p53 broken]
+  s1 --> s3: no signal to grow
+  s1 --> s4: passes the first check
+  s1 --> s5: the DNA is damaged
+  s2 --> s1: the damage is repaired
+  s2 --> s6: copies it anyway
+  s3 --> s1: a growth signal arrives
+  s4 --> s7: the copy is done
+  s5 --> s1: the damage is repaired
+  s5 --> s9: too much damage
+  s6 --> s7: the damage is copied as a mutation
+  s7 --> s8: the DNA is damaged
+  s7 --> s11: passes the second check
+  s8 --> s7: the damage is repaired
+  s11 --> s12: the nucleus opens
+  s8 --> s9: too much damage [p53 working]
+  s12 --> s13: fibres catch some chromosomes
+  s12 --> s14: fibres catch some [check broken]
+  s13 --> s15: every chromosome is caught
+  s14 --> s15: every chromosome is caught
+  s14 --> s16: pulled apart anyway
+  s15 --> s17: the sisters are pulled apart
+  s16 --> s18: two nuclei form
+  s17 --> s18: two nuclei form
+  s18 --> s19: the cell pinches
+  s19 --> s20: splits, chromosomes uneven
+  s19 --> s21: splits in two
+  s19 --> s22: splits, passing the mutation on
+  classDef breaks fill:#ffecee,stroke:#e72e3b,stroke-width:2.5px,color:#cd2834
+  class s1 bugPath
+  class s2 bugPath
+  class s4 bugPath
+  class s6 breaks
+  class s6 bugPath
+  class s7 bugPath
+  class s11 bugPath
+  class s12 bugPath
+  class s13 bugPath
+  class s14 bugPath
+  class s15 bugPath
+  class s16 breaks
+  class s16 bugPath
+  class s17 bugPath
+  class s18 bugPath
+  class s19 bugPath
+  class s20 breaks
+  class s20 bugPath
+  class s22 breaks
+  class s22 bugPath

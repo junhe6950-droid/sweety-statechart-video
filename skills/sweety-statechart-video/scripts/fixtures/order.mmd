@@ -1,0 +1,23 @@
+stateDiagram-v2
+    %% an order, from the cart to the door (Mermaid sample for scv.py import)
+    direction TB
+    state "购物车" as cart
+    state "付款中" as paying
+    [*] --> cart
+    cart --> paying : 下单 [stock > 0]
+    paying --> paid : 付款成功
+    paying --> cart : 付款失败
+    state "配送" as shipping {
+        [*] --> packing
+        packing --> onroad : 发货
+        onroad --> arrived : 送达
+        arrived --> [*]
+    }
+    paid --> shipping : 商家接单
+    shipping --> refunded : 申请退款 [没人签收]
+    refunded --> [*]
+    note right of cart : 用户还在挑
+    note left of paid
+        付款以后
+        才进入配送
+    end note

@@ -326,7 +326,10 @@ def _search(chart, logic=False, fix=None, limit=LIMIT):
     var0 = chart.get('vars') or {}
     vnames = sorted(var0) if logic else []
     vindex = {n: i for i, n in enumerate(vnames)}
+    snames = state_names(chart)
+    known = set(vindex) | (set(snames) if logic else set())
     errors, free = [], []
+    uses_states = False
 
     # the arrows, with their logic compiled once
     moves = []
@@ -346,9 +349,10 @@ def _search(chart, logic=False, fix=None, limit=LIMIT):
             except ExprError as e:
                 errors.append(f'{tid}: when {w!r}: {e}')
                 continue
-            if names(g) - set(vindex):
+            if names(g) - known:
                 free.append(tid)                             # words, not logic: always possible
                 continue
+            uses_states = uses_states or bool(names(g) & set(snames))
             guards.append(g)
         if logic and isinstance(t.get('do'), dict):
             for k, v in t['do'].items():
@@ -368,13 +372,15 @@ def _search(chart, logic=False, fix=None, limit=LIMIT):
     END = frozenset(['end'])
     prev = {init: None}
     q, edges_seen = deque([init]), 0
-    stuck, stuck_seen, taken = [], set(), set()
+    stuck, stuck_seen, stuck_keys, taken = [], set(), [], set()
     while q and len(prev) < limit:
         key = q.popleft()
         cfg, vals, hist = key
         if cfg == END:
             continue
-        env = dict(zip(vnames, vals)) if logic else None
+        env = dict(zip(vnames, vals)) if logic else {}
+        if uses_states:
+            env.update(_state_env(cfg, snames))
         out = 0
         for t, tid, guards, sets in moves:
             a, b = t.get('from'), t.get('to')
@@ -419,15 +425,32 @@ def _search(chart, logic=False, fix=None, limit=LIMIT):
             if nkey not in prev:
                 prev[nkey] = (key, t)
                 q.append(nkey)
-        if out == 0 and cfg not in stuck_seen:
-            stuck_seen.add(cfg)
-            stuck.append(sorted(cfg))
+        if out == 0:
+            stuck_keys.append(key)
+            if cfg not in stuck_seen:
+                stuck_seen.add(cfg)
+                stuck.append(sorted(cfg))
     reach = set()
     for k in prev:
         reach |= set(k[0])
     return {'init': init, 'prev': prev, 'stuck': stuck, 'configurations': len(prev), 'transitions': edges_seen,
             'capped': bool(q) and len(prev) >= limit, 'reach': reach, 'taken': taken, 'errors': errors,
-            'free': sorted(set(free)), 'vnames': vnames}
+            'free': sorted(set(free)), 'vnames': vnames, 'stuck_keys': stuck_keys, 'snames': snames}
+
+
+def state_names(chart):
+    """{name: leaves} for every name an expression may use for "this state is active": cards, the box, its lanes."""
+    states, groups, regs, lanes, parent, T = _model(chart)
+    out = {s: {s} for s in states}
+    for l in lanes.values():
+        out[l['id']] = set(l['states'])
+    if regs:
+        out[regs['id']] = _leaves(regs['id'], groups, regs, lanes)
+    return out
+
+
+def _state_env(cfg, snames):
+    return {n: bool(leaves & cfg) for n, leaves in snames.items()}
 
 
 def explore(chart, limit=LIMIT, logic=False):
@@ -455,14 +478,20 @@ def _trace(prev, goal):
 
 def _rule_result(ex, bad):
     """the shortest path to a configuration holding `bad`, or holds."""
+    r = _first(ex, lambda key: bad in key[0])
+    return {'holds': r.pop('holds'), 'never': bad, **r}
+
+
+def _first(ex, broken):
+    """the shortest path to the first configuration where broken(key) is true, or {'holds': True}."""
     goal = None
-    # breadth-first order: the first configuration holding the bad state is a shortest path to it
+    # breadth-first order: the first configuration that breaks the rule is at the end of a shortest path
     for key in ex['prev']:
-        if bad in key[0]:
+        if broken(key):
             goal = key
             break
     if goal is None:
-        out = {'holds': True, 'never': bad}
+        out = {'holds': True}
         if ex['capped']:
             out['capped'] = True
         return out
@@ -477,16 +506,78 @@ def _rule_result(ex, bad):
         path.append(t['to'] if t['to'] in new else (new[0] if new else t['to']))
         if values is not None:
             values.append(dict(zip(ex['vnames'], nkey[1])))
-    out = {'holds': False, 'never': bad, 'path': path, 'edges': edges, 'steps': len(edges)}
+    out = {'holds': False, 'path': path, 'edges': edges, 'steps': len(edges)}
     if values is not None:
         out['values'] = values
     return out
 
 
+def _endings(chart):
+    """cards with no arrow out at all (nor from their lane or box): drawn as endings, so resting there is not stuck."""
+    states, groups, regs, lanes, parent, T = _model(chart)
+    srcs = {t['from'] for t in T if t.get('from') != '*'}
+    return {s for s in states if not ({s, parent.get(s), parent.get(parent.get(s))} & srcs)}
+
+
+def _rule_test(rule, ex, chart):
+    """broken(key) for one entry of chapter.rules, or None when the checker cannot read it (a reported rule)."""
+    snames = ex['snames']
+
+    def env(key):
+        e = dict(zip(ex['vnames'], key[1])) if ex['vnames'] else {}
+        e.update(_state_env(key[0], snames))
+        return e
+    if rule.get('never') is not None:
+        v = rule['never']
+        if v in snames:
+            leaves = snames[v]
+            return lambda key: bool(leaves & key[0])
+        tree = parse(v)
+        return lambda key: bool(evaluate(tree, env(key)))
+    if rule.get('always') is not None:
+        tree = parse(rule['always'])
+        return lambda key: not evaluate(tree, env(key))
+    if rule.get('stuck') is False:
+        ends = _endings(chart)
+        bad = {k for k in ex['stuck_keys'] if not (len(k[0]) == 1 and k[0] <= ends)}
+        return lambda key: key in bad
+    return None
+
+
+def _one_rule(chart, rule, ex, poss, logic, limit):
+    """{holds, path, edges, steps, (values, possible, fixed)} for one entry of chapter.rules."""
+    if not isinstance(rule, dict):
+        return {'holds': None, 'error': 'a rule is an object like {"never": "state"}'}
+    try:
+        test = _rule_test(rule, ex, chart)
+        if test is None:
+            rep = rule.get('reported')
+            if isinstance(rep, dict) and 'holds' in rep:
+                return {**rep, 'source': 'report'}
+            return {'holds': None, 'error': 'nothing to check: give never, always or "stuck": false'}
+        out = _first(ex, test)
+        if poss is not None:
+            try:
+                out['possible'] = _first(poss, _rule_test(rule, poss, chart))
+            except ExprError:
+                pass                                         # a rule about vars has no answer without the logic
+        fix = rule.get('fix')
+        if isinstance(fix, dict) and fix.get('edge'):
+            fx = _search(chart, logic=logic or bool(fix.get('when')), fix=fix, limit=limit)
+            r = _first(fx, _rule_test(rule, fx, chart))
+            r['edge'] = fix['edge']
+            if fix.get('when'):
+                r['when'] = fix['when']
+            out['fixed'] = r
+        return out
+    except ExprError as e:
+        return {'holds': None, 'error': str(e)}
+
+
 def has_logic(chart):
     rule = chart.get('rule') or {}
-    fix = rule.get('fix') if isinstance(rule.get('fix'), dict) else {}
-    return bool(chart.get('vars')) or bool(fix.get('when')) or any(
+    fixes = [rule.get('fix')] + [r.get('fix') for r in chart.get('rules') or [] if isinstance(r, dict)]
+    return bool(chart.get('vars')) or any(isinstance(f, dict) and f.get('when') for f in fixes) or any(
         t.get('when') or t.get('do') for t in chart.get('transitions') or [])
 
 
@@ -522,6 +613,12 @@ def check_chart(chart, limit=LIMIT):
             if fix.get('when'):
                 r['when'] = fix['when']
             res['rule']['fixed'] = r
+    rules = chart.get('rules')
+    if isinstance(rules, list) and rules:
+        res['rules'] = [_one_rule(chart, r, ex, poss if logic else None, logic, limit) for r in rules]
+        res['checked'] = {'states': ex['configurations'], 'steps': ex['transitions']}
+        if ex['capped']:
+            res['checked']['capped'] = True
     return res
 
 
@@ -563,6 +660,8 @@ def chart_of(ch):
     chart = {'states': [{'id': s} for s in states], 'transitions': T, 'regions': regs, 'rule': ch.get('rule')}
     if ch.get('vars'):
         chart['vars'] = ch['vars']
+    if ch.get('rules'):
+        chart['rules'] = ch['rules']
     return chart
 
 
@@ -579,13 +678,18 @@ def lint_chapter(ch):
             errors.append(f'vars.{k}: give a number, true / false or a string (got {v!r})')
     edges = ch.get('edges') or []
     ids = _edge_ids(edges)
+    regs = ch.get('regions') if isinstance(ch.get('regions'), dict) else {}
+    snames = set(ch.get('states') or {}) | ({regs.get('id') or 'together'} if regs else set()) | {
+        l.get('id') for l in regs.get('lanes') or [] if isinstance(l, dict)}
+    for k in set(vars_) & snames:
+        errors.append(f'vars.{k} has the name of a state; rename one of them')
     for e, eid in zip(edges, ids):
         w = e.get('when')
         if w is not None:
             try:
-                unknown = sorted(names(parse(w)) - set(vars_))
+                unknown = sorted(names(parse(w)) - set(vars_) - snames)
                 if unknown:
-                    warnings.append(f'arrow {eid}: when {w!r} uses {", ".join(unknown)}, which is not in vars, '
+                    warnings.append(f'arrow {eid}: when {w!r} uses {", ".join(unknown)}, which is not in vars (nor a state), '
                                     f'so the checker counts this arrow as always possible')
             except (ExprError, TypeError) as ex:
                 errors.append(f'arrow {eid}: when {w!r} is not an expression the checker can read: {ex}')
@@ -604,25 +708,76 @@ def lint_chapter(ch):
                 except (ExprError, TypeError) as ex:
                     errors.append(f'arrow {eid}: do {k} = {v!r} is not an expression the checker can read: {ex}')
     rule = ch.get('rule') or {}
-    fix = rule.get('fix')
+    rules = ch.get('rules')
     steps = [s for s in ch.get('steps') or [] if isinstance(s, dict)]
     marked = [i + 1 for i, s in enumerate(ch.get('steps') or []) if isinstance(s, dict) and s.get('fix')]
-    if fix is not None:
+    known = set(vars_) | snames
+
+    def lint_expr(where, text):
+        try:
+            unknown = sorted(names(parse(text)) - known)
+            if unknown:
+                errors.append(f'{where} {text!r} uses {", ".join(unknown)}: not a state of this chapter, nor in vars')
+        except (ExprError, TypeError) as ex:
+            errors.append(f'{where} {text!r} is not an expression the checker can read: {ex}')
+
+    def lint_fix(where, r):
+        fix = r.get('fix')
         if not isinstance(fix, dict) or not fix.get('edge'):
-            errors.append('rule.fix needs "edge": the arrow the fix cuts or guards, like "a>b"')
-        else:
-            if not (rule.get('never') or rule.get('breaks')):
-                errors.append('rule.fix needs a rule "never" to fix')
-            if fix['edge'] not in ids:
-                errors.append(f'rule.fix.edge {fix["edge"]!r} matches no arrow (arrows: {", ".join(ids)})')
-            if fix.get('when'):
-                try:
-                    parse(fix['when'])
-                except (ExprError, TypeError) as ex:
-                    errors.append(f'rule.fix.when {fix["when"]!r} is not an expression the checker can read: {ex}')
-            if not marked and steps:
-                warnings.append('rule.fix is set but no step has "fix": true, so the film never shows the fix')
-    elif marked:
+            errors.append(f'{where}.fix needs "edge": the arrow the fix cuts or guards, like "a>b"')
+            return
+        if fix['edge'] not in ids:
+            errors.append(f'{where}.fix.edge {fix["edge"]!r} matches no arrow (arrows: {", ".join(ids)})')
+        if fix.get('when'):
+            lint_expr(f'{where}.fix.when', fix['when'])
+    fixes = 0
+    if rule.get('fix') is not None:
+        fixes += 1
+        lint_fix('rule', rule)
+        if not (rule.get('never') or rule.get('breaks')):
+            errors.append('rule.fix needs a rule "never" to fix')
+    rule_ids = []
+    if rules is not None and not isinstance(rules, list):
+        errors.append('rules must be a list like [{"never": "state", "text": "..."}]')
+        rules = []
+    for i, r in enumerate(rules or []):
+        where = f'rules[{i + 1}]'
+        if not isinstance(r, dict):
+            errors.append(f'{where}: write a rule as an object, like {{"never": "state", "text": "..."}}')
+            continue
+        rule_ids.append(r.get('id'))
+        kinds = [k for k in ('never', 'always', 'stuck') if r.get(k) is not None]
+        if len(kinds) > 1:
+            errors.append(f'{where}: give one of never / always / stuck, not {" and ".join(kinds)}')
+        elif not kinds and not isinstance(r.get('reported'), dict):
+            errors.append(f'{where}: nothing to check; give never (a state or an expression), always (an expression) or "stuck": false')
+        if r.get('never') is not None and r['never'] not in snames:
+            lint_expr(f'{where}.never', r['never'])
+        if r.get('always') is not None:
+            lint_expr(f'{where}.always', r['always'])
+        if r.get('stuck') not in (None, False):
+            errors.append(f'{where}: write "stuck": false (the chart never gets stuck)')
+        if r.get('fix') is not None:
+            fixes += 1
+            lint_fix(where, r)
+    dup = sorted({x for x in rule_ids if x and rule_ids.count(x) > 1})
+    if dup:
+        errors.append(f'rules: the id {dup[0]!r} is used twice')
+    for i, s in enumerate(ch.get('steps') or []):
+        tr = s.get('trace') if isinstance(s, dict) else None
+        if tr in (None, False):
+            continue
+        if tr is True:
+            if not (rule or rules):
+                errors.append(f'step {i + 1}: "trace": true but the chapter has no rule')
+        elif isinstance(tr, int):
+            if not (1 <= tr <= len(rules or [])):
+                errors.append(f'step {i + 1}: "trace": {tr} but the chapter has {len(rules or [])} rules (count from 1)')
+        elif tr not in rule_ids:
+            errors.append(f'step {i + 1}: "trace": {tr!r} names no rule (rule ids: {", ".join(str(x) for x in rule_ids if x) or "none"})')
+    if fixes and not marked and steps:
+        warnings.append('a rule has a fix but no step has "fix": true, so the film never shows the fix')
+    elif marked and not fixes:
         errors.append(f'step {marked[0]} has "fix": true but the chapter has no rule.fix')
     return errors, warnings
 
@@ -637,7 +792,8 @@ def check_film(spec):
 
 def apply_found_paths(spec):
     """Give every rule that breaks the path the checker found (unless the film names its own path), and every rule
-    with a fix the result of the re-run (rule.fixed)."""
+    with a fix the result of the re-run (rule.fixed). A chapter with a rules list gets rules[i].result (holds, path,
+    edges, steps...) and checked = {states, steps}, like TLC's report."""
     for ch, r in zip(spec.get('chapters') or [], check_film(spec)):
         rule = ch.get('rule')
         if rule and r.get('rule') and not r['rule']['holds'] and not rule.get('path'):
@@ -645,4 +801,9 @@ def apply_found_paths(spec):
             rule['found'] = True
         if rule and r.get('rule') and r['rule'].get('fixed'):
             rule['fixed'] = r['rule']['fixed']
+        if isinstance(ch.get('rules'), list) and r.get('rules'):
+            for item, res in zip(ch['rules'], r['rules']):
+                if isinstance(item, dict):
+                    item['result'] = res
+            ch['checked'] = r['checked']
     return spec

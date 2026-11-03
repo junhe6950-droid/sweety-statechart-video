@@ -1,0 +1,14 @@
+stateDiagram-v2
+    %% kitchen and rider at the same time: a concurrent composite with -- between the regions
+    [*] --> off
+    off --> working : 上班
+    state "营业中" as working {
+        [*] --> kwait
+        kwait --> kcook : 来单
+        kcook --> kwait : 出餐
+        --
+        [*] --> rgo
+        rgo --> rwait : 到店
+        rwait --> rgo : 取餐 [出餐口有餐]
+    }
+    working --> off : 打烊

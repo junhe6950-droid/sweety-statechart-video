@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A door with a lock and an alarm that remembers where it was (SCXML sample for scv.py import) -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="closed" datamodel="ecmascript" name="door">
+  <datamodel>
+    <data id="locked" expr="false"/>
+    <data id="tries" expr="0"/>
+  </datamodel>
+  <state id="closed">
+    <transition event="open" cond="!locked" target="opened"/>
+    <transition event="lock" cond="!locked" target="closed">
+      <assign location="locked" expr="true"/>
+    </transition>
+    <transition event="force" cond="locked &amp;&amp; tries &lt; 3" target="alarm">
+      <assign location="tries" expr="tries + 1"/>
+    </transition>
+  </state>
+  <state id="opened">
+    <transition event="close" target="closed"/>
+  </state>
+  <state id="alarm" initial="beep">
+    <history id="alarm_h" type="shallow">
+      <transition target="beep"/>
+    </history>
+    <state id="beep">
+      <transition event="tick" target="flash"/>
+    </state>
+    <state id="flash">
+      <transition event="tick" target="beep"/>
+    </state>
+    <transition event="reset" target="closed"/>
+    <transition event="hold" target="pause"/>
+    <transition event="break" cond="tries &gt;= 2" target="gone"/>
+  </state>
+  <state id="pause">
+    <transition event="resume" target="alarm_h"/>
+  </state>
+  <final id="gone"/>
+</scxml>
