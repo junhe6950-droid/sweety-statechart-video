@@ -59,7 +59,7 @@ import i18n
 CHECKS_VERSION = 2              # 2: a pinyin-only pass earns one more seed
 ATTEMPTS = 4
 SPEECH_RATE_RANGE = (3., 8.)   # syllables/s of speech span; only gross stretching or truncation (realistic-man ~6.6)
-SPEECH_RATE_RANGE_WORDS = (2., 7.)  # spaced languages (vowel groups): old-master reads English at 2.1-2.9 with CER 0
+SPEECH_RATE_RANGE_WORDS = (2., 8.)  # spaced languages (vowel groups): old-master reads English at 2.1-2.9, short lines reach 7.8, CER 0
 LEAD_SECONDS = .06             # kept before the first speech frame
 RAW_TAIL_SECONDS = .6          # kept after the last speech frame until the tail rule decides
 TAIL_QUIET_DB = -40.           # the last syllable has ended once the level stays this far under the clip peak...
