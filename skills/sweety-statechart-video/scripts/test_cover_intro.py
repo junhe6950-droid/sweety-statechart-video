@@ -33,7 +33,7 @@ class CoverIntroTests(unittest.TestCase):
         ffmpeg('-f', 'lavfi', '-i', 'color=red:s=120x120', '-frames:v', '1', self.cover)
         ffmpeg('-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=2', self.audio)
         self.timing = {'W': 120, 'H': 160, 'fps': 30, 'duration': 2,
-                       'steps': [{'t0': .25, 't1': 1.5, 'note': '测试字幕', 'tag': 'I.1'}]}
+                       'steps': [{'t0': .25, 't1': 1.5, 'note': '测试字幕', 'tag': 'I.1', 'chars': [['测', .3, .5]]}]}
         (self.job / 'work/timing.json').write_text(json.dumps(self.timing))
 
     def finalize(self, **spec):
@@ -66,6 +66,8 @@ class CoverIntroTests(unittest.TestCase):
         self.assertGreater(max(abs(value) for value in samples[52000:70000]), .05)
         captions = (self.job / 'outputs/editing/captions.srt').read_text()
         self.assertIn('00:00:01,250 --> 00:00:02,500', captions)
+        delivery = json.loads((self.job / 'outputs/editing/delivery-timing.json').read_text())
+        self.assertEqual(delivery['steps'][0]['chars'], [['测', 1.3, 1.5]])
         self.finalize()
         self.assertAlmostEqual(self.duration(video), 3, places=2)
         self.assertEqual((self.job / 'outputs/editing/captions.srt').read_text(), captions)
