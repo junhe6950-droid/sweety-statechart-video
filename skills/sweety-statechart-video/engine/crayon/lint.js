@@ -169,7 +169,8 @@
       if (cov.solid > .08) issues.push({ chapter: num, kind: 'heavy', share: cov.solid, fix: `${Math.round(cov.solid * 100)}% of tiles are heavy dark or saturated blocks (aim ≤ 8%): open up the hatching, lighten big solid fills` });
       if (sp > 1500) issues.push({ chapter: num, kind: 'spill', pixels: sp, fix: 'scene ink beyond the poster edge: pull it inside (bleeding off an edge on purpose is fine for big set pieces)' });
       still.forEach(s => issues.push({ chapter: num, kind: 'still', step: s.step, fix: `step ${num}.${s.step} (${s.note}): the pictures do not change; make the active state show (S.on / S.since)` }));
-      pp.forEach(p => issues.push({ chapter: num, kind: 'people', detail: p, fix: p.kind === 'scale' ? `${p.who} at (${p.at}) has scale ${p.s} (people 0.7–0.9, a hero up to 1.5)` : `${p.who.join(' and ')} stand ${p.dy} apart vertically: put their feet on one ground line` }));
+      const name = w => typeof w === 'string' ? w : w && typeof w === 'object' ? `a person (${[w.build, w.shirt && w.shirt + ' shirt', w.hat].filter(Boolean).join(', ') || 'custom'})` : String(w);
+      pp.forEach(p => issues.push({ chapter: num, kind: 'people', detail: p, fix: p.kind === 'scale' ? `${name(p.who)} at (${p.at}) has scale ${p.s} (people 0.7–0.9, a hero up to 1.5)` : `${p.who.map(name).join(' and ')} stand ${p.dy} apart vertically: put their feet on one ground line` }));
       return { num, title: ch.title, overlap: ov, coverage: cov, spill: sp, still, people: ppl.length };
     });
     (f.warnings || []).forEach(wn => issues.push({ chapter: null, kind: 'theme', fix: wn }));

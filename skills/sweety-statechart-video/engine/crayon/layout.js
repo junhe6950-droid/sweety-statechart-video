@@ -302,7 +302,7 @@
   /* ---------------- edge words ---------------- */
   function placeWords(e, env, size = SIZE.label) {
     if (!e.text) return;
-    const m = K.measureWords(g2d(), e.text, size), lh = size * 1.22, asc = size * .8;
+    const m = K.measureWords(g2d(), e.fixText ? e.text + '\n' + e.fixText : e.text, size), lh = size * 1.22, asc = size * .8;
     const cands = [];
     const box = (x, top, align) => {
       const x0 = align === 'left' ? x : align === 'right' ? x - m.w : x - m.w / 2;
@@ -393,7 +393,7 @@
       for (const lo of laneOpts) {
         lanes = layLanes(lo);
         const wsum = lanes.reduce((a, L) => a + Math.max(lanes.length > 1 ? 300 : 360, L.bb.x1 - L.bb.x0 + 52) + 34, 0) + 6;
-        if (wsum <= 950) break;
+        if (wsum <= W - 50) break;
       }
       function layLanes(lo) { return ch.regions.lanes.map((ln, li) => {
         ln.states.forEach(s => laneOf[s] = ln.id);
@@ -416,11 +416,20 @@
         const bb = { x0: Math.min(...parts.map(r => r.x0)), y0: Math.min(...parts.map(r => r.y0)), x1: Math.max(...parts.map(r => r.x1)), y1: Math.max(...parts.map(r => r.y1)) };
         return { ln, li, ids: ids.concat([sid]), edges: es, startEdge, bb };
       }); }
-      const PADX = 26, HEAD = 42, PADT = 18, PADB = 24, GAPR = 34, OUTER = 20, OHEAD = ch.regions.title != null && lanes.length > 1 ? 46 : 0;
-      const minW = lanes.length > 1 ? 300 : 360;
+      let PADX = 26, GAPR = 34, OUTER = 20, minW = lanes.length > 1 ? 300 : 360;
+      const HEAD = 42, PADT = 18, PADB = 24, OHEAD = ch.regions.title != null && lanes.length > 1 ? 46 : 0;
+      // three lanes on a 1000-wide poster: tighten the padding and let narrow lanes be narrow, so the frame stays on the paper
+      const avail = W - 40, n = lanes.length;
+      const needW = () => lanes.reduce((a, L) => a + Math.max(minW, L.bb.x1 - L.bb.x0 + 2 * PADX), 0) + GAPR * (n - 1) + 2 * OUTER;
+      if (needW() > avail) {
+        const was = minW;
+        PADX = 14; GAPR = 16; OUTER = 10; minW = 0;
+        const spare = Math.max(0, (avail - needW()) / n);
+        lanes.forEach(L => { L.minW = Math.min(was, L.bb.x1 - L.bb.x0 + 2 * PADX + spare); });
+      }
       let x = OUTER;
       const regions = lanes.map(L => {
-        const w = Math.max(minW, L.bb.x1 - L.bb.x0 + 2 * PADX), h = L.bb.y1 - L.bb.y0 + HEAD + PADT + PADB;
+        const w = Math.max(L.minW ?? minW, L.bb.x1 - L.bb.x0 + 2 * PADX), h = L.bb.y1 - L.bb.y0 + HEAD + PADT + PADB;
         const r = { lane: L, x0: x, y0: OHEAD + OUTER - (OHEAD ? 6 : 0), w, h };
         x += w + GAPR;
         return r;

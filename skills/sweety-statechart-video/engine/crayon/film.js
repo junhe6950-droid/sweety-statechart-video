@@ -43,6 +43,9 @@
         const base = e.from + '>' + e.to; seen[base] = (seen[base] || 0) + 1;
         return { ...e, id: e.id || (seen[base] > 1 ? base + '#' + seen[base] : base), text: K.layout.edgeText(e) };
       });
+      // the fix writes one more line under its arrow's words: lay the words out with room for it
+      const fx = ch.rule && ch.rule.fix, fxe = fx && ch.edges.find(e => e.id === fx.edge);
+      if (fxe && (fx.if || fx.when)) fxe.fixText = `[${fx.if || fx.when}]`;
       if (ch.regions && ch.regions.lanes && ch.regions.lanes.length > 1) {
         // a guard that waits on another region is written in that region's colour (an edge may name it with "waits")
         const lanes = ch.regions.lanes, laneOf = {};
@@ -250,7 +253,8 @@
     if (K.motion) K.motion.bind($, ctx, f, ch);
     for (const [name, fn] of Object.entries(K.props || {})) $[name] = (...a) => fn(ctx, ...a);
     $.pose = K.pose;
-    $.box = id => ch.L.boxes[id];
+    const parcel = $.box;                       // $.box('id') is a card's place; $.box(x, y, w, h) is still the parcel prop
+    $.box = (id, ...a) => typeof id === 'string' ? ch.L.boxes[id] : parcel ? parcel(id, ...a) : undefined;
     $.dot = (...a) => K.dot(ctx, ...a);
     $.set = (name, area, st) => K.sets.draw(ctx, name, area, st, $);
     return $;
