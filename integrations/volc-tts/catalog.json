@@ -1,0 +1,11 @@
+{
+  "voices": [
+    {
+      "id": "volc-seed-tts-2",
+      "name": "火山 TTS 2.0",
+      "description": "External Volcengine narration supplied to the job directory",
+      "chars_per_second": 5
+    }
+  ]
+}
+
